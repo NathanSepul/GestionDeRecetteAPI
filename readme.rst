@@ -21,7 +21,7 @@ Gestion de recette
 
 |
 
-3. installation packages
+3. Installation packages
 
 .. code-block:: sh
     
@@ -29,7 +29,25 @@ Gestion de recette
 
 |
 
-4. lancer le projet (at the root of projet)
+
+4. Configuration des variables d'environnement
+
+Ajoutez un fichier ``.env`` à la racine du dossier de l'API en incluant les informations suivantes :
+
+.. code-block:: txt
+
+    DEBUG=True
+
+    # DB
+    DB_USER= 
+    DB_PASSWORD= 
+    DB_DATABASE=isl_forum
+    DB_HOST= 
+    DB_PORT=
+
+|
+
+5. start project
 
 .. code-block:: sh
     
