@@ -6,10 +6,12 @@ import recette.api_views
 urlpatterns = [
 
     path('',recette.api_views.RecetteListAPIView.as_view()),
+    path('lite/',recette.api_views.ReceetteListLiteAPIView.as_view()),
     path('<int:pk>/', recette.api_views.RecetteRetrieveAPIView.as_view()),
     path('create/', recette.api_views.RecetteCreateAPIView.as_view()),
     path('<int:pk>/update/',recette.api_views.RecetteUpdateAPIView.as_view()),
     path('<int:pk>/remove/',recette.api_views.RecetteDeleteAPIView.as_view()),
+    path('<int:pk>/ingredient/reorder/<int:pkIngredient>/', recette.api_views.IngredientReorderAPIView.as_view()),
 
     path('<int:pk>/ingredient/', recette.api_views.InredientRetrieveAPIView.as_view()),
     path('ingredient/create/', recette.api_views.InredientCreateAPIView.as_view()),

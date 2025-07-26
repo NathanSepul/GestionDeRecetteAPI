@@ -14,7 +14,7 @@ class RecetteAdminTopic(admin.ModelAdmin):
 
 @admin.register(recette.models.Ingredient)
 class RecetteAdminTopic(admin.ModelAdmin):
-    list_display = ( 'quantite', 'nom', 'isSection' ,'recette')
+    list_display = ( 'noOrdre','quantite', 'nom', 'isSection' ,'recette')
     readonly_fields =[ 'id',]
     list_per_page = 20
     search_fields = ('nom',)
@@ -22,7 +22,7 @@ class RecetteAdminTopic(admin.ModelAdmin):
 
 @admin.register(recette.models.Preparation)
 class RecetteAdminTopic(admin.ModelAdmin):
-    list_display = ( '__str__', 'isSection' ,'recette')
+    list_display = ( 'noOrdre','__str__', 'isSection' ,'recette')
     readonly_fields =[ 'id',]
     list_per_page = 20
     ordering = ('recette', 'noOrdre')

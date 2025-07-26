@@ -5,12 +5,28 @@ from rest_framework import status
 import recette
 import recette.models
 import recette.serializer
-
-
+from django.db import transaction
+from rest_framework.views import APIView 
 
 
 ######
 ######
+class ReceetteListLiteAPIView(generics.ListAPIView):
+    queryset = recette.models.Recette.objects.all()
+    serializer_class = recette.serializer.RecetteLiteSerializer
+    paginator = None
+
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        queryparam_TypeRecette = self.request.GET.get('typeRecetteId', '')
+        
+        if queryparam_TypeRecette:
+            queryset = queryset.filter(typeRecette=queryparam_TypeRecette)
+        
+        return queryset.order_by('titre')
 
 class RecetteListAPIView(generics.ListAPIView):
     """
@@ -111,32 +127,33 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
         return super().put(request, *args, **kwargs)
     
     def update(self, request,  *args, **kwargs):
-        try:
-            instance = self.get_object()
-            old_portion = instance.portion
-            
-            response = super().update(request, *args, **kwargs)
+        with transaction.atomic():
+            try:
+                instance = self.get_object()
+                old_portion = instance.portion
                 
-            if request.data["image"] is None:
-                instance.image = None
-            else: 
-                instance.image= request.data["image"]
+                response = super().update(request, *args, **kwargs)
+                    
+                if request.data["image"] is None:
+                    instance.image = None
+                else: 
+                    instance.image= request.data["image"]
 
-            if response.status_code == status.HTTP_200_OK:    
-                new_portion = Decimal(request.data["portion"])
-                if old_portion != 0: 
-                    scaling_factor = new_portion / old_portion 
-                    print(scaling_factor)     
-                    self._adapt_ingredient_quantities(instance, scaling_factor)
+                if response.status_code == status.HTTP_200_OK:    
+                    new_portion = Decimal(request.data["portion"])
+                    if old_portion != 0: 
+                        scaling_factor = new_portion / old_portion 
+                        print(scaling_factor)     
+                        self._adapt_ingredient_quantities(instance, scaling_factor)
 
 
-            instance.typeRecette__id = request.data["typeRecette"]; 
-            instance.portion = new_portion; 
-            instance.titre = request.data["titre"]; 
-            instance.save()
-            return Response("Recette updated", status=status.HTTP_200_OK)
-        except Exception as e:
-            raise Response(f"An error occurred during update recette: {e}")
+                instance.typeRecette__id = request.data["typeRecette"]; 
+                instance.portion = new_portion; 
+                instance.titre = request.data["titre"]; 
+                instance.save()
+                return Response("Recette updated", status=status.HTTP_200_OK)
+            except Exception as e:
+                raise Response(f"An error occurred during update recette: {e}")
                 
 ########################
 ########################
@@ -158,7 +175,7 @@ class InredientRetrieveAPIView(generics.ListAPIView):
     def get_queryset(self):
         queryset = super().get_queryset()
         queryset = queryset.filter(recette__id=self.kwargs["pk"])
-        return queryset.order_by('recette_id')
+        return queryset.order_by('noOrdre')
     
 class InredientCreateAPIView(generics.CreateAPIView):
     """
@@ -183,6 +200,50 @@ class InredientUpdateAPIView(generics.UpdateAPIView):
     
     def update(self, request,  *args, **kwargs):
         return super().update(request, *args, **kwargs)
+    
+class IngredientReorderAPIView(APIView):
+    queryset = recette.models.Ingredient.objects.all()
+    serializer_class = recette.serializer.ReorderSerializer
+
+    def get_queryset(self):
+        return recette.models.Ingredient.objects.filter(recette__id=self.kwargs["pk"]).order_by('noOrdre')
+    
+    def post(self, request, pk, pkIngredient, *args, **kwargs):
+        try:
+            serializer = self.serializer_class(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            new_position = serializer.validated_data["newPosition"]
+
+            ingredients_for_recette = self.get_queryset()    
+            ingredient_to_move = recette.models.Ingredient.objects.get(id=self.kwargs["pkIngredient"])
+            old_position = ingredient_to_move.noOrdre
+           
+            max_order = ingredients_for_recette[len(ingredients_for_recette)-1].noOrdre
+            if new_position < 0:
+                new_position = 0
+            if new_position > max_order:
+                new_position = max_order
+
+            if old_position != new_position:
+                with transaction.atomic():
+                    if old_position < new_position:
+                        for ingredient in ingredients_for_recette.filter(noOrdre__gt=old_position, noOrdre__lte=new_position):
+                            ingredient.noOrdre -= 1
+                            ingredient.save() 
+                    else:
+                        for ingredient in ingredients_for_recette.filter(noOrdre__gte=new_position, noOrdre__lt=old_position):
+                            ingredient.noOrdre += 1
+                            ingredient.save() 
+
+                    ingredient_to_move.noOrdre = new_position
+                    ingredient_to_move.save()
+
+            updatedIngredients = self.get_queryset()             
+            serializer = recette.serializer.IngredientSerializer(updatedIngredients, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"detail": f"Une erreur s'est produite lors de la réorganisation : {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
 
 class IngredientDeleteAPIView(generics.DestroyAPIView):
     queryset = recette.models.Ingredient.objects.all()

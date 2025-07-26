@@ -139,8 +139,9 @@ USE_TZ = True
 #     'django.contrib.staticfiles.finders.FileSystemFinder',
 #     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 # )
-STATIC_URL = './static/'
-STATIC_ROOT = './static'
+
+STATIC_ROOT = 'static'
+STATIC_URL = '/static/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -165,7 +166,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'gestionDeRecette.serializer.MyPagination',
 
     
-    'PAGE_SIZE': 10,
+    'PAGE_SIZE': 5,
     'DEFAULT_PERMISSION_CLASSES': [
         # 'rest_framework.permissions.IsAuthenticated',
     ],

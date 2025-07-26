@@ -5,6 +5,11 @@ from rest_framework import  serializers
 import recette.models
 from django.db.models import Max
 
+class RecetteLiteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = recette.models.Recette
+        fields = ['id', 'titre', 'typeRecette' ]
+
 class RecetteSerializer(serializers.ModelSerializer):
     class Meta:
         model = recette.models.Recette
@@ -28,8 +33,6 @@ class IngredientSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"recette": "Recette ID"})
 
         max_no_ordre = recette.models.Ingredient.objects.filter( recette=recette_instance ).aggregate(Max('noOrdre'))['noOrdre__max']
-
-        max_no_ordre =  recette.models.Ingredient.objects.aggregate(Max('noOrdre'))['noOrdre__max']
         
         next_no_ordre = (max_no_ordre or 0) + 1
         validated_data['noOrdre'] = next_no_ordre
@@ -50,11 +53,17 @@ class PreparationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"recette": "Recette ID"})
 
         max_no_ordre = recette.models.Preparation.objects.filter( recette=recette_instance ).aggregate(Max('noOrdre'))['noOrdre__max']
-
-        max_no_ordre =  recette.models.Preparation.objects.aggregate(Max('noOrdre'))['noOrdre__max']
         
         next_no_ordre = (max_no_ordre or 0) + 1
         validated_data['noOrdre'] = next_no_ordre
 
         obj = recette.models.Preparation.objects.create(**validated_data)
         return obj
+
+
+class ReorderSerializer(serializers.Serializer):
+    newPosition = serializers.IntegerField(min_value=0)
+    
+    class Meta:
+        model = recette.models.Ingredient
+        fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette' ]
