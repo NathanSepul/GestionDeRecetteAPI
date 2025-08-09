@@ -5,5 +5,5 @@
 *.log
 *.pot
 *.pyc
-__pycache__
+gestionDeRecette/__pycache__
 media
