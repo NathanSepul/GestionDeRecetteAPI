@@ -114,11 +114,12 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
     serializer_class = recette.serializer.RecetteSerializer
 
     def _adapt_ingredient_quantities(self, recette_instance, scaling_factor):
-        for ingredient in recette_instance.ingredients.all():
-            if ingredient.quantite is not None and not ingredient.isSection:
-                new_quantity = ingredient.quantite * scaling_factor
-                ingredient.quantite = new_quantity.quantize(Decimal('0.01')) # Round to 2 decimal places
-                ingredient.save() # Save the updated ingredient
+        if 1 != scaling_factor:
+            for ingredient in recette_instance.ingredients.all():
+                if ingredient.quantite is not None and not ingredient.isSection:
+                    new_quantity = ingredient.quantite * scaling_factor
+                    ingredient.quantite = new_quantity.quantize(Decimal('0.01')) # Round to 2 decimal places
+                    ingredient.save() # Save the updated ingredient
 
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)    
@@ -139,14 +140,17 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
                 else: 
                     instance.image= request.data["image"]
 
-                if response.status_code == status.HTTP_200_OK:    
-                    new_portion = Decimal(request.data["portion"])
-                    if old_portion != 0: 
-                        scaling_factor = new_portion / old_portion 
-                        print(scaling_factor)     
-                        self._adapt_ingredient_quantities(instance, scaling_factor)
 
+                if request.data["adapteQuantity"]:
+                    if response.status_code == status.HTTP_200_OK:    
+                        new_portion = Decimal(request.data["portion"])
+                        if old_portion != 0: 
+                            print("update Quantitée")
+                            scaling_factor = new_portion / old_portion    
+                            self._adapt_ingredient_quantities(instance, scaling_factor)
 
+                print( instance.portion )
+                print(request.data["typeRecette"])
                 instance.typeRecette__id = request.data["typeRecette"]; 
                 instance.portion = new_portion; 
                 instance.titre = request.data["titre"]; 

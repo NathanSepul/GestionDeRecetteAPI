@@ -11,9 +11,10 @@ class RecetteLiteSerializer(serializers.ModelSerializer):
         fields = ['id', 'titre', 'typeRecette' ]
 
 class RecetteSerializer(serializers.ModelSerializer):
+    adapteQuantity = serializers.BooleanField(default=True)
     class Meta:
         model = recette.models.Recette
-        fields = ['id', 'titre', 'portion', 'typeRecette','image', 'conseil' ]
+        fields = ['id', 'titre', 'portion', 'typeRecette','image', 'conseil', 'adapteQuantity' ]
     
     def get_image(self, obj):
         if obj.image:
@@ -63,7 +64,7 @@ class PreparationSerializer(serializers.ModelSerializer):
 
 class ReorderSerializer(serializers.Serializer):
     newPosition = serializers.IntegerField(min_value=0)
-    
+
     class Meta:
         model = recette.models.Ingredient
         fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette' ]
