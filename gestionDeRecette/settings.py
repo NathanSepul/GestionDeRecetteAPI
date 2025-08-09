@@ -14,17 +14,23 @@ env = environ.Env(
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-#bfn+t_amzd4t3v64aj=rikhdsd%)wp^5b@)7w+q4*%jwufanp'
+SECRET_KEY = os.environ["SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
 
-ALLOWED_HOSTS = ['*']
+if DEBUG :
+    ALLOWED_HOSTS = ['*']
+else :
+    ALLOWED_HOSTS = ['sepul.be']
+    
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",
+
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -38,8 +44,6 @@ INSTALLED_APPS = [
 
     'rest_framework',
     'drf_yasg',
-    
-
 ]
 
 MIDDLEWARE = [
@@ -53,6 +57,11 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'gestionDeRecette.urls'
+
+
+CSRF_USE_SESSIONS = True
+SESSION_COOKIE_SECURE = True
+
 
 TEMPLATES = [
     {
@@ -73,7 +82,8 @@ TEMPLATES = [
 ]
 
 
-WSGI_APPLICATION = 'gestionDeRecette.wsgi.application'
+WSGI_APPLICATION = 'gestionDeRecette.wsgi.application' 
+ASGI_APPLICATION = "gestionDeRecette.asgi:application"
 
 
 # Database
