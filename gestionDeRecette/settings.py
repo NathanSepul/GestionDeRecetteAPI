@@ -83,7 +83,7 @@ TEMPLATES = [
 
 
 WSGI_APPLICATION = 'gestionDeRecette.wsgi.application' 
-ASGI_APPLICATION = "gestionDeRecette.asgi:application"
+ASGI_APPLICATION = 'gestionDeRecette.asgi:application'
 
 
 # Database
