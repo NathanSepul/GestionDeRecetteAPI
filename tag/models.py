@@ -10,7 +10,7 @@ class Tag(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'Tag'
+        db_table = 'tag'
         verbose_name = "tag"
         verbose_name_plural = "tags"
 
@@ -20,6 +20,6 @@ class TagRecette(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'TagRecette'
+        db_table = 'tagrecette'
         verbose_name = "tag de la recette"
         verbose_name_plural = "tags de recette"

@@ -10,7 +10,7 @@ class Recette(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'Recette'
+        db_table = 'recette'
         unique_together = (('titre', 'typeRecette'),)
         verbose_name = "recette"
         verbose_name_plural = "recettes"
@@ -32,7 +32,7 @@ class Ingredient(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'Ingredient'
+        db_table = 'ingredient'
         verbose_name = "ingredient"
         verbose_name_plural = "ingredients"
     
@@ -46,7 +46,7 @@ class Preparation(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'Preparation'
+        db_table = 'preparation'
         verbose_name = "preparation"
         verbose_name_plural = "preparations"
     
