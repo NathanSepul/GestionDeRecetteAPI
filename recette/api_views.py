@@ -145,12 +145,10 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
                     if response.status_code == status.HTTP_200_OK:    
                         new_portion = Decimal(request.data["portion"])
                         if old_portion != 0: 
-                            print("update Quantitée")
                             scaling_factor = new_portion / old_portion    
                             self._adapt_ingredient_quantities(instance, scaling_factor)
 
-                print( instance.portion )
-                print(request.data["typeRecette"])
+                print(request.data["image"])
                 instance.typeRecette__id = request.data["typeRecette"]; 
                 instance.portion = new_portion; 
                 instance.titre = request.data["titre"]; 
