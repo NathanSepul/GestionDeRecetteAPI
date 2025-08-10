@@ -20,6 +20,6 @@ class TagRecette(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'tagrecette'
+        db_table = 'tagRecette'
         verbose_name = "tag de la recette"
         verbose_name_plural = "tags de recette"
