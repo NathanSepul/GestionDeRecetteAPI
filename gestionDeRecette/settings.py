@@ -29,8 +29,6 @@ else :
 # Application definition
 
 INSTALLED_APPS = [
-    # "daphne",
-
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -83,7 +81,6 @@ TEMPLATES = [
 
 
 WSGI_APPLICATION = 'gestionDeRecette.wsgi.application' 
-# ASGI_APPLICATION = 'gestionDeRecette.asgi:application'
 
 
 # Database
