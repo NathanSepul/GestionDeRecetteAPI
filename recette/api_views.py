@@ -132,30 +132,27 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
             try:
                 instance = self.get_object()
                 old_portion = instance.portion
-                
-                response = super().update(request, *args, **kwargs)
-                    
-                if request.data["image"] is None:
+
+                serializer = self.get_serializer(instance, data=request.data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+
+                image_data = request.data.get("image")
+                if image_data:
+                    # Convert the string to bytes before saving
+                    instance.image = image_data.encode('utf-8')
+                elif image_data is None:
                     instance.image = None
-                else: 
-                    instance.image= request.data["image"]
 
+                if request.data.get("adapteQuantity"):
+                    if old_portion != 0: 
+                        scaling_factor = instance.portion / old_portion    
+                        self._adapt_ingredient_quantities(instance, scaling_factor)
 
-                if request.data["adapteQuantity"]:
-                    if response.status_code == status.HTTP_200_OK:    
-                        new_portion = Decimal(request.data["portion"])
-                        if old_portion != 0: 
-                            scaling_factor = new_portion / old_portion    
-                            self._adapt_ingredient_quantities(instance, scaling_factor)
-
-                print(request.data["image"])
-                instance.typeRecette__id = request.data["typeRecette"]; 
-                instance.portion = new_portion; 
-                instance.titre = request.data["titre"]; 
                 instance.save()
                 return Response("Recette updated", status=status.HTTP_200_OK)
             except Exception as e:
-                raise Response(f"An error occurred during update recette: {e}")
+               return Response(f"An error occurred during update recette: {e}", status=status.HTTP_400_BAD_REQUEST)
                 
 ########################
 ########################

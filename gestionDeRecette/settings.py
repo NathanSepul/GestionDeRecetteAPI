@@ -133,6 +133,17 @@ USE_L10N = True
 
 USE_TZ = True
 
+# Django Emails
+EMAIL_BACKEND = 'gestionDeRecette.mail.CustomEmailBackend' 
+DEBUG_EMAIL = env('DEBUG_EMAIL')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
+EMAIL_HOST_USER = env('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
+EMAIL_HOST = env('EMAIL_HOST')
+EMAIL_PORT = env('EMAIL_PORT')
+EMAIL_USE_TLS = False  
+EMAIL_USE_SSL = True 
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
