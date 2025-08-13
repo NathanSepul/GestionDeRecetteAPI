@@ -3,7 +3,9 @@ import tag
 import tag.serializer
 from rest_framework.response import Response
 from rest_framework import status
+from drf_spectacular.utils import extend_schema
 
+@extend_schema(tags=['Tag'])
 class TagListAPIView(generics.ListAPIView):
     """
     list of tags
@@ -25,6 +27,7 @@ class TagListAPIView(generics.ListAPIView):
             
         return queryset.order_by('tag')
 
+@extend_schema(tags=['Tag'])
 class TagCreateAPIView(generics.CreateAPIView):
     """
     Create tag
@@ -48,7 +51,8 @@ class TagUpdateAPIView(generics.UpdateAPIView):
     
     def update(self, request,  *args, **kwargs):
         return super().update(request, *args, **kwargs)
-       
+
+@extend_schema(tags=['Tag'])  
 class TagDeleteAPIView(generics.DestroyAPIView):
     queryset = tag.models.Tag.objects.all()
     serializer_class = tag.serializer.TagSerializer
@@ -63,35 +67,35 @@ class TagDeleteAPIView(generics.DestroyAPIView):
 ########################
 
 
-class TagRecetteCreateAPIView(generics.CreateAPIView):
-    """
-    Create tag
-    """
+# class TagRecetteCreateAPIView(generics.CreateAPIView):
+#     """
+#     Create tag
+#     """
 
-    queryset = tag.models.TagRecette.objects.all()
-    serializer_class = tag.serializer.TagRecetteSerializer
+#     queryset = tag.models.TagRecette.objects.all()
+#     serializer_class = tag.serializer.TagRecetteSerializer
 
-    def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)
+#     def post(self, request, *args, **kwargs):
+#         return super().post(request, *args, **kwargs)
 
-class TagRecetteDeleteAPIView(generics.DestroyAPIView):
-    queryset = tag.models.TagRecette.objects.all()
-    serializer_class = tag.serializer.TagRecetteSerializer
+# class TagRecetteDeleteAPIView(generics.DestroyAPIView):
+#     queryset = tag.models.TagRecette.objects.all()
+#     serializer_class = tag.serializer.TagRecetteSerializer
 
-    def delete(self, request, pk, format=None):
-        tagReceette = self.get_object()
-        tagReceette.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)  
+#     def delete(self, request, pk, format=None):
+#         tagReceette = self.get_object()
+#         tagReceette.delete()
+#         return Response(status=status.HTTP_204_NO_CONTENT)  
 
-class TagRecetteUpdateAPIView(generics.UpdateAPIView):
-    queryset = tag.models.TagRecette.objects.all()
-    serializer_class = tag.serializer.TagRecetteSerializer
+# class TagRecetteUpdateAPIView(generics.UpdateAPIView):
+#     queryset = tag.models.TagRecette.objects.all()
+#     serializer_class = tag.serializer.TagRecetteSerializer
 
-    def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)    
+#     def post(self, request, *args, **kwargs):
+#         return super().post(request, *args, **kwargs)    
 
-    def put(self, request, *args, **kwargs):
-        return super().put(request, *args, **kwargs)
+#     def put(self, request, *args, **kwargs):
+#         return super().put(request, *args, **kwargs)
     
-    def update(self, request,  *args, **kwargs):
-        return super().update(request, *args, **kwargs)
+#     def update(self, request,  *args, **kwargs):
+#         return super().update(request, *args, **kwargs)

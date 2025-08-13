@@ -8,7 +8,7 @@ class TypeRecetteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = typeRecette.models.TypeRecette
-        fields = ['id', 'noOrdre', 'type', 'pathToSave' ]
+        fields = ['id', 'noOrdre', 'type', ]
 
     def create(self, validated_data):
         max_no_ordre =  typeRecette.models.TypeRecette.objects.aggregate(Max('noOrdre'))['noOrdre__max']

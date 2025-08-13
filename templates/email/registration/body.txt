@@ -1,0 +1,18 @@
+Cher(e) {{user.first_name}},
+
+Nous vous remercions de vous être inscrit(e) sur notre plateforme. Nous sommes ravis de vous accueillir ! Afin de finaliser votre inscription, veuillez cliquer sur le lien suivant :
+
+{{ verification_url | safe }}
+
+En cliquant sur ce lien, vous allez vérifier votre adresse email et accéder pleinement à notre plateforme.
+
+Veuillez noter que ce lien n'est utilisable qu'une seule fois et qu'il est valide pendant 7 jours. Si vous ne complétez pas votre inscription dans ce délai, vous devrez vous inscrire à nouveau.
+
+Si vous n'avez pas créé de compte sur notre plateforme, veuillez ignorer cet email. Aucune action supplémentaire n'est requise.
+
+Si vous avez des questions ou avez besoin d'assistance, n'hésitez pas à contacter notre équipe de support à l'adresse suivante : nathan@sepul.be .
+
+Nous vous souhaitons la bienvenue et sommes impatients de vous accompagner !
+
+Cordialement,
+L'équipe de l'ISL Forum

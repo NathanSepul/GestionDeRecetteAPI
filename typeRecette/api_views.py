@@ -4,7 +4,9 @@ import typeRecette.serializer
 import typeRecette.models
 from rest_framework.response import Response
 from rest_framework import status
+from drf_spectacular.utils import extend_schema
 
+@extend_schema(tags=['Type de recette'])
 class TypeRecetteListAPIView(generics.ListAPIView):
     """
     list of type recette
@@ -25,6 +27,7 @@ class TypeRecetteListAPIView(generics.ListAPIView):
 
         return queryset.order_by('noOrdre')
 
+@extend_schema(tags=['Type de recette'])
 class TypeRecetteCreateAPIView(generics.CreateAPIView):
     """
     Create type recette
@@ -37,6 +40,7 @@ class TypeRecetteCreateAPIView(generics.CreateAPIView):
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
 
+@extend_schema(tags=['Type de recette'])
 class TypeRecetteUpdateAPIView(generics.UpdateAPIView):
     queryset = typeRecette.models.TypeRecette.objects.all()
     serializer_class = typeRecette.serializer.TypeRecetteSerializer
@@ -50,6 +54,7 @@ class TypeRecetteUpdateAPIView(generics.UpdateAPIView):
     def update(self, request,  *args, **kwargs):
         return super().update(request, *args, **kwargs)
 
+@extend_schema(tags=['Type de recette'])
 class TypeRecetteDeleteAPIView(generics.DestroyAPIView):
     queryset = typeRecette.models.TypeRecette.objects.all()
     serializer_class = typeRecette.serializer.TypeRecetteSerializer

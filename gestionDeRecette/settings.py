@@ -36,12 +36,15 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    'user',
     'typeRecette',
     'recette',
     'tag',
 
     'rest_framework',
-    'drf_yasg',
+    'rest_registration',
+    'rest_framework_simplejwt',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -57,8 +60,8 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'gestionDeRecette.urls'
 
 
-CSRF_USE_SESSIONS = True
-SESSION_COOKIE_SECURE = True
+# CSRF_USE_SESSIONS = True
+# SESSION_COOKIE_SECURE = True
 
 
 TEMPLATES = [
@@ -100,23 +103,29 @@ DATABASES = {
     }
 }
 
+AUTH_USER_MODEL = 'user.User'
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
+
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
+        # minimum 8
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        # au moins une majuscule
+        'NAME': 'gestionDeRecette.validators.UppercaseValidator',
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        # au moins une minuscule
+        'NAME': 'gestionDeRecette.validators.LowercaseValidator',
     },
+    # {
+    #     # au moins un caractère spécial
+    #     'NAME': 'django.contrib.auth.password_validation.SymbolValidator',
+    # },
 ]
 
 
@@ -124,13 +133,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
 LANGUAGE_CODE = 'fr-be'
-
 TIME_ZONE = 'CET'
-
 USE_I18N = True
-
 USE_L10N = True
-
 USE_TZ = True
 
 # Django Emails
@@ -166,28 +171,60 @@ STATIC_URL = '/static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-DEFAULT_RENDERER_CLASSES = (
-    'rest_framework.renderers.JSONRenderer',
-)
-
-if DEBUG:
-    DEFAULT_RENDERER_CLASSES = DEFAULT_RENDERER_CLASSES + (
-        'rest_framework.renderers.BrowsableAPIRenderer',
-    )
-else:
-    DEFAULT_RENDERER_CLASSES = DEFAULT_RENDERER_CLASSES
-
-
 REST_FRAMEWORK = {
-    'DEFAULT_RENDERER_CLASSES': DEFAULT_RENDERER_CLASSES,
-    # 'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'DEFAULT_PAGINATION_CLASS': 'gestionDeRecette.serializer.MyPagination',
-
+    'DEFAULT_RENDERER_CLASSES': ('rest_framework.renderers.JSONRenderer',),
     
+    'DEFAULT_PAGINATION_CLASS': 'gestionDeRecette.serializer.MyPagination',
     'PAGE_SIZE': 5,
-    'DEFAULT_PERMISSION_CLASSES': [
-        # 'rest_framework.permissions.IsAuthenticated',
-    ],
+
+    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
+    'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',),
+
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Gestion de recette API',
+    'DESCRIPTION': 'Petite application permettant de gerer des recette',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
+
+
+
+REST_REGISTRATION = {
+   'REGISTER_VERIFICATION_ENABLED': True,
+    'REGISTER_EMAIL_VERIFICATION_ENABLED': False,
+    'RESET_PASSWORD_VERIFICATION_ENABLED': True,
+
+    'REGISTER_VERIFICATION_URL': 'http://127.0.0.1:8000/registration/verify-email/',
+    'RESET_PASSWORD_VERIFICATION_URL': 'http://127.0.0.1:8000/reset-password/formulaire/',
+
+    'VERIFICATION_FROM_EMAIL': 'nathan@sepul.be',
+
+    'REGISTER_VERIFICATION_AUTO_LOGIN': True,
+    'REGISTER_VERIFICATION_ONE_TIME_USE': True,
+    'RESET_PASSWORD_VERIFICATION_ONE_TIME_USE': True,
+
+    'REGISTER_VERIFICATION_EMAIL_TEMPLATES': {
+        'subject':  'email/registration/subject.txt',
+        'text_body':  'email/registration/body.txt',
+
+    },
+    
+    'RESET_PASSWORD_VERIFICATION_EMAIL_TEMPLATES':{
+        'subject':  'email/reset_password/subject.txt',
+        'text_body':  'email/reset_password/body.txt',
+    }
+}
+
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
+    'SLIDING_TOKEN_LIFETIME': timedelta(days=30),
+    'SLIDING_TOKEN_REFRESH_LIFETIME_LATE_USER': timedelta(days=1),
+    'SLIDING_TOKEN_LIFETIME_LATE_USER': timedelta(days=30),
 }
 
 

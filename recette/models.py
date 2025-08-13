@@ -1,15 +1,17 @@
 from django.db import models
 from typeRecette.models import TypeRecette
+from user.models import User
+from django.utils.translation import gettext_lazy as _
 
 class Recette(models.Model):
+    user = models.ForeignKey(User, on_delete=models.PROTECT, verbose_name=_("Utilisateur"))
     titre = models.CharField(max_length=100)
     portion = models.IntegerField(blank=False, null=False)
-    typeRecette = models.ForeignKey(TypeRecette, models.DO_NOTHING, db_column='idTypeRecette')
+    typeRecette = models.ForeignKey(TypeRecette, models.DO_NOTHING)
     image = models.BinaryField(blank=True, null=True)
     conseil = models.TextField(blank=True, null=True)
 
     class Meta:
-        managed = False
         db_table = 'recette'
         unique_together = (('titre', 'typeRecette'),)
         verbose_name = "recette"
@@ -24,14 +26,13 @@ class Recette(models.Model):
 
 
 class Ingredient(models.Model):
-    recette = models.ForeignKey(Recette, models.DO_NOTHING, db_column='idRecette', related_name="ingredients")  
+    recette = models.ForeignKey(Recette, models.DO_NOTHING, verbose_name=_("Recette"))
     noOrdre = models.IntegerField()  
     isSection = models.BooleanField(default=False) 
     quantite = models.DecimalField(max_digits=9, decimal_places=2, blank=True, null=True)
     nom = models.TextField()
 
     class Meta:
-        managed = False
         db_table = 'ingredient'
         verbose_name = "ingredient"
         verbose_name_plural = "ingredients"
@@ -39,13 +40,12 @@ class Ingredient(models.Model):
     
 
 class Preparation(models.Model):
-    recette = models.ForeignKey(Recette, models.DO_NOTHING, db_column='idRecette')
+    recette = models.ForeignKey(Recette, models.DO_NOTHING, verbose_name=_("Recette"))
     noOrdre = models.IntegerField()
     description = models.TextField()
     isSection = models.BooleanField(default=False)
 
     class Meta:
-        managed = False
         db_table = 'preparation'
         verbose_name = "preparation"
         verbose_name_plural = "preparations"

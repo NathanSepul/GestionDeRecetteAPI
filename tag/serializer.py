@@ -6,9 +6,9 @@ import tag.models
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = tag.models.Tag
-        fields = ['id', 'tag', 'red', 'green','blue', 'opcite' ]
+        fields = ['id', 'tag', 'red', 'green','blue', 'opacite' ]
 
-class TagRecetteSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = tag.models.TagRecette
-        fields = ['id', 'tag', 'recette']
+# class TagRecetteSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = tag.models.TagRecette
+#         fields = ['id', 'tag', 'recette']

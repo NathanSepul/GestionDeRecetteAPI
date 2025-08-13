@@ -7,11 +7,12 @@ import recette.models
 import recette.serializer
 from django.db import transaction
 from rest_framework.views import APIView 
+from rest_framework.permissions import AllowAny
+from drf_spectacular.utils import extend_schema
 
 
-######
-######
-class ReceetteListLiteAPIView(generics.ListAPIView):
+@extend_schema(tags=['Recette'])
+class RecetteListLiteAPIView(generics.ListAPIView):
     queryset = recette.models.Recette.objects.all()
     serializer_class = recette.serializer.RecetteLiteSerializer
     paginator = None
@@ -28,6 +29,7 @@ class ReceetteListLiteAPIView(generics.ListAPIView):
         
         return queryset.order_by('titre')
 
+@extend_schema(tags=['Recette'])
 class RecetteListAPIView(generics.ListAPIView):
     """
     list of recette
@@ -35,8 +37,13 @@ class RecetteListAPIView(generics.ListAPIView):
 
     queryset = recette.models.Recette.objects.all()
     serializer_class = recette.serializer.RecetteSerializer
+    permission_classes = [AllowAny]
 
-    # @swagger_auto_schema(operation_id='Get comments', security=[],)
+    @extend_schema(
+        operation_id='get list recette',
+        description='get list recette',
+        # security=[],
+    )   
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
     
@@ -75,7 +82,7 @@ class RecetteListAPIView(generics.ListAPIView):
         else:
             return queryset.order_by('titre')
         
-
+@extend_schema(tags=['Recette'])
 class RecetteRetrieveAPIView(generics.RetrieveAPIView):
     """
     Returns the **selected** Recette informations.
@@ -88,7 +95,7 @@ class RecetteRetrieveAPIView(generics.RetrieveAPIView):
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
     
-
+@extend_schema(tags=['Recette'])
 class RecetteCreateAPIView(generics.CreateAPIView):
     """
     Create tag
@@ -99,7 +106,7 @@ class RecetteCreateAPIView(generics.CreateAPIView):
 
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)    
-
+@extend_schema(tags=['Recette'])
 class RecetteDeleteAPIView(generics.DestroyAPIView):
     queryset = recette.models.Recette.objects.all()
     serializer_class = recette.serializer.RecetteSerializer
@@ -108,7 +115,8 @@ class RecetteDeleteAPIView(generics.DestroyAPIView):
         recette = self.get_object()
         recette.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
+
+@extend_schema(tags=['Recette'])  
 class RecetteUpdateAPIView(generics.UpdateAPIView):
     queryset = recette.models.Recette.objects.all()
     serializer_class = recette.serializer.RecetteSerializer
@@ -157,8 +165,8 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
 ########################
 ########################
 
-
-class InredientRetrieveAPIView(generics.ListAPIView):
+@extend_schema(tags=['Ingredient'])
+class IngredientRetrieveAPIView(generics.ListAPIView):
     """
     list of ingredientt
     """
@@ -175,8 +183,9 @@ class InredientRetrieveAPIView(generics.ListAPIView):
         queryset = super().get_queryset()
         queryset = queryset.filter(recette__id=self.kwargs["pk"])
         return queryset.order_by('noOrdre')
-    
-class InredientCreateAPIView(generics.CreateAPIView):
+
+@extend_schema(tags=['Ingredient'])
+class IngredientCreateAPIView(generics.CreateAPIView):
     """
     Create tag
     """
@@ -186,8 +195,9 @@ class InredientCreateAPIView(generics.CreateAPIView):
 
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)  
-
-class InredientUpdateAPIView(generics.UpdateAPIView):
+    
+@extend_schema(tags=['Ingredient'])
+class IngredientUpdateAPIView(generics.UpdateAPIView):
     queryset = recette.models.Ingredient.objects.all()
     serializer_class = recette.serializer.IngredientSerializer
 
@@ -200,6 +210,7 @@ class InredientUpdateAPIView(generics.UpdateAPIView):
     def update(self, request,  *args, **kwargs):
         return super().update(request, *args, **kwargs)
     
+@extend_schema(tags=['Ingredient'])
 class IngredientReorderAPIView(APIView):
     queryset = recette.models.Ingredient.objects.all()
     serializer_class = recette.serializer.ReorderSerializer
@@ -244,6 +255,7 @@ class IngredientReorderAPIView(APIView):
         except Exception as e:
             return Response({"detail": f"Une erreur s'est produite lors de la réorganisation : {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
 
+@extend_schema(tags=['Ingredient'])
 class IngredientDeleteAPIView(generics.DestroyAPIView):
     queryset = recette.models.Ingredient.objects.all()
     serializer_class = recette.serializer.IngredientSerializer
@@ -256,7 +268,7 @@ class IngredientDeleteAPIView(generics.DestroyAPIView):
 ########################
 ########################
 
-
+@extend_schema(tags=['Preparation'])
 class PreparationRetrieveAPIView(generics.ListAPIView):
     """
     list of prépration
@@ -273,7 +285,8 @@ class PreparationRetrieveAPIView(generics.ListAPIView):
         queryset = super().get_queryset()
         queryset = queryset.filter(recette_id=self.kwargs["pk"])
         return queryset.order_by('noOrdre')
-
+    
+@extend_schema(tags=['Preparation'])
 class PreparationCreateAPIView(generics.CreateAPIView):
     """
     Create tag
@@ -285,6 +298,7 @@ class PreparationCreateAPIView(generics.CreateAPIView):
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)  
 
+@extend_schema(tags=['Preparation'])
 class PreparationDeleteAPIView(generics.DestroyAPIView):
     queryset = recette.models.Preparation.objects.all()
     serializer_class = recette.serializer.PreparationSerializer
@@ -294,6 +308,7 @@ class PreparationDeleteAPIView(generics.DestroyAPIView):
         preparation.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)   
 
+@extend_schema(tags=['Preparation'])
 class PreparationUpdateAPIView(generics.UpdateAPIView):
     queryset = recette.models.Preparation.objects.all()
     serializer_class = recette.serializer.PreparationSerializer

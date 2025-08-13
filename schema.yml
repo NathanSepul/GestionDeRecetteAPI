@@ -1,0 +1,1404 @@
+openapi: 3.0.3
+info:
+  title: Gestion de recette API
+  version: 1.0.0
+  description: Petite application permettant de gerer des recette
+paths:
+  /api/login/:
+    post:
+      operationId: api_login_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/recette/:
+    get:
+      operationId: api_recette_list
+      description: list of recette
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRecetteList'
+          description: ''
+  /api/recette/{id}/:
+    get:
+      operationId: api_recette_retrieve
+      description: Returns the **selected** Recette informations.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recette'
+          description: ''
+  /api/recette/{id}/ingredient/:
+    get:
+      operationId: api_recette_ingredient_list
+      description: list of ingredientt
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedIngredientList'
+          description: ''
+  /api/recette/{id}/ingredient/reorder/{pkIngredient}/:
+    post:
+      operationId: api_recette_ingredient_reorder_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: pkIngredient
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Reorder'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Reorder'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Reorder'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reorder'
+          description: ''
+  /api/recette/{id}/preparation/:
+    get:
+      operationId: api_recette_preparation_list
+      description: list of prépration
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPreparationList'
+          description: ''
+  /api/recette/{id}/remove/:
+    delete:
+      operationId: api_recette_remove_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/recette/{id}/update/:
+    post:
+      operationId: api_recette_update_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Recette'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Recette'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Recette'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recette'
+          description: ''
+    put:
+      operationId: api_recette_update_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Recette'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Recette'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Recette'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recette'
+          description: ''
+    patch:
+      operationId: api_recette_update_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRecette'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRecette'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRecette'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recette'
+          description: ''
+  /api/recette/create/:
+    post:
+      operationId: api_recette_create_create
+      description: Create tag
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Recette'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Recette'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Recette'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recette'
+          description: ''
+  /api/recette/ingredient/{id}/remove/:
+    delete:
+      operationId: api_recette_ingredient_remove_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/recette/ingredient/{id}/update/:
+    post:
+      operationId: api_recette_ingredient_update_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Ingredient'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Ingredient'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Ingredient'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+          description: ''
+    put:
+      operationId: api_recette_ingredient_update_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Ingredient'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Ingredient'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Ingredient'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+          description: ''
+    patch:
+      operationId: api_recette_ingredient_update_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedIngredient'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedIngredient'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedIngredient'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+          description: ''
+  /api/recette/ingredient/create/:
+    post:
+      operationId: api_recette_ingredient_create_create
+      description: Create tag
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Ingredient'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Ingredient'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Ingredient'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+          description: ''
+  /api/recette/lite/:
+    get:
+      operationId: api_recette_lite_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRecetteLiteList'
+          description: ''
+  /api/recette/preparation/{id}/remove/:
+    delete:
+      operationId: api_recette_preparation_remove_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/recette/preparation/{id}/update/:
+    post:
+      operationId: api_recette_preparation_update_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Preparation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Preparation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Preparation'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preparation'
+          description: ''
+    put:
+      operationId: api_recette_preparation_update_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Preparation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Preparation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Preparation'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preparation'
+          description: ''
+    patch:
+      operationId: api_recette_preparation_update_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPreparation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPreparation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPreparation'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preparation'
+          description: ''
+  /api/recette/preparation/create/:
+    post:
+      operationId: api_recette_preparation_create_create
+      description: Create tag
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Preparation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Preparation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Preparation'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preparation'
+          description: ''
+  /api/tag/:
+    get:
+      operationId: api_tag_list
+      description: list of tags
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTagList'
+          description: ''
+  /api/tag/{id}/remove/:
+    delete:
+      operationId: api_tag_remove_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/tag/{id}/update/:
+    post:
+      operationId: api_tag_update_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Tag'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Tag'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Tag'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+          description: ''
+    put:
+      operationId: api_tag_update_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Tag'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Tag'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Tag'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+          description: ''
+    patch:
+      operationId: api_tag_update_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTag'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTag'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTag'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+          description: ''
+  /api/tag/create/:
+    post:
+      operationId: api_tag_create_create
+      description: Create tag
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Tag'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Tag'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Tag'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+          description: ''
+  /api/token/refresh/:
+    post:
+      operationId: api_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/token/verify/:
+    post:
+      operationId: api_token_verify_create
+      description: |-
+        Takes a token and indicates if it is valid.  This view provides no
+        information about a token's fitness for a particular use.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenVerify'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenVerify'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenVerify'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenVerify'
+          description: ''
+  /api/typeRecette/:
+    get:
+      operationId: api_typeRecette_list
+      description: list of type recette
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTypeRecetteList'
+          description: ''
+  /api/typeRecette/{id}/remove/:
+    delete:
+      operationId: api_typeRecette_remove_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/typeRecette/{id}/update/:
+    post:
+      operationId: api_typeRecette_update_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TypeRecette'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TypeRecette'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TypeRecette'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypeRecette'
+          description: ''
+    put:
+      operationId: api_typeRecette_update_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TypeRecette'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TypeRecette'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TypeRecette'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypeRecette'
+          description: ''
+    patch:
+      operationId: api_typeRecette_update_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTypeRecette'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTypeRecette'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTypeRecette'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypeRecette'
+          description: ''
+  /api/typeRecette/create/:
+    post:
+      operationId: api_typeRecette_create_create
+      description: Create type recette
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TypeRecette'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TypeRecette'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TypeRecette'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypeRecette'
+          description: ''
+components:
+  schemas:
+    Ingredient:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        noOrdre:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        isSection:
+          type: boolean
+        quantite:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,2})?$
+          nullable: true
+        nom:
+          type: string
+        recette:
+          type: integer
+      required:
+      - id
+      - noOrdre
+      - nom
+      - recette
+    PaginatedIngredientList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ingredient'
+    PaginatedPreparationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Preparation'
+    PaginatedRecetteList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Recette'
+    PaginatedRecetteLiteList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecetteLite'
+    PaginatedTagList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+    PaginatedTypeRecetteList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TypeRecette'
+    PatchedIngredient:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        noOrdre:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        isSection:
+          type: boolean
+        quantite:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,2})?$
+          nullable: true
+        nom:
+          type: string
+        recette:
+          type: integer
+    PatchedPreparation:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        noOrdre:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        description:
+          type: string
+        isSection:
+          type: boolean
+        recette:
+          type: integer
+    PatchedRecette:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        titre:
+          type: string
+          maxLength: 100
+        portion:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        typeRecette:
+          type: integer
+        image:
+          type: string
+          format: byte
+          readOnly: true
+          nullable: true
+        conseil:
+          type: string
+          nullable: true
+        adapteQuantity:
+          type: boolean
+          default: true
+    PatchedTag:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        tag:
+          type: string
+          maxLength: 100
+        red:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        green:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        blue:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        opacite:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+    PatchedTypeRecette:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        noOrdre:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+        type:
+          type: string
+          maxLength: 10
+    Preparation:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        noOrdre:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        description:
+          type: string
+        isSection:
+          type: boolean
+        recette:
+          type: integer
+      required:
+      - description
+      - id
+      - noOrdre
+      - recette
+    Recette:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        titre:
+          type: string
+          maxLength: 100
+        portion:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        typeRecette:
+          type: integer
+        image:
+          type: string
+          format: byte
+          readOnly: true
+          nullable: true
+        conseil:
+          type: string
+          nullable: true
+        adapteQuantity:
+          type: boolean
+          default: true
+      required:
+      - id
+      - image
+      - portion
+      - titre
+      - typeRecette
+    RecetteLite:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        titre:
+          type: string
+          maxLength: 100
+        typeRecette:
+          type: integer
+      required:
+      - id
+      - titre
+      - typeRecette
+    Reorder:
+      type: object
+      properties:
+        newPosition:
+          type: integer
+          minimum: 0
+      required:
+      - newPosition
+    Tag:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        tag:
+          type: string
+          maxLength: 100
+        red:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        green:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        blue:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        opacite:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+      required:
+      - blue
+      - green
+      - id
+      - opacite
+      - red
+      - tag
+    TokenObtainPair:
+      type: object
+      properties:
+        email:
+          type: string
+          writeOnly: true
+        password:
+          type: string
+          writeOnly: true
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - email
+      - password
+      - refresh
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          writeOnly: true
+      required:
+      - access
+      - refresh
+    TokenVerify:
+      type: object
+      properties:
+        token:
+          type: string
+          writeOnly: true
+      required:
+      - token
+    TypeRecette:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        noOrdre:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+        type:
+          type: string
+          maxLength: 10
+      required:
+      - id
+      - type
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

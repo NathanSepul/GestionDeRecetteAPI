@@ -51,7 +51,7 @@ class Recette(models.Model):
 class Tag(models.Model):
     id = models.IntegerField(primary_key=True)
     tag = models.CharField(max_length=100)
-    opcite = models.IntegerField()
+    opacite = models.IntegerField()
     red = models.IntegerField()
     green = models.IntegerField()
     blue = models.IntegerField()
@@ -85,7 +85,6 @@ class Typerecette(models.Model):
     id = models.IntegerField(primary_key=True)
     noordre = models.IntegerField(db_column='noOrdre', blank=True, null=True)  # Field name made lowercase.
     type = models.CharField(max_length=10, blank=True, null=True)
-    pathtosave = models.TextField(db_column='pathToSave', blank=True, null=True)  # Field name made lowercase.
 
     class Meta:
         managed = False
