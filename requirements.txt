@@ -8,10 +8,10 @@ cryptography==45.0.6
 daphne==4.2.1
 Django==4.2.23
 django-environ==0.12.0
+django-rest-registration==0.9.0
 djangorestframework==3.16.0
+djangorestframework_simplejwt==5.5.1
 drf-spectacular==0.28.0
-drf-spectacular-sidecar==2025.8.1
-drf-yasg==1.21.10
 hyperlink==21.0.0
 idna==3.10
 incremental==24.7.2
@@ -23,11 +23,13 @@ pillow==11.2.1
 pyasn1==0.6.1
 pyasn1_modules==0.4.2
 pycparser==2.22
+PyJWT==2.10.1
 PyMySQL==1.1.1
 pyOpenSSL==25.1.0
 pytz==2025.2
 PyYAML==6.0.2
 referencing==0.36.2
+rest-framework-simplejwt==0.0.2
 rpds-py==0.27.0
 service-identity==24.2.0
 sqlparse==0.5.3

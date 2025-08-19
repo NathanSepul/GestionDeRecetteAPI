@@ -11,11 +11,11 @@ urlpatterns = [
     path('<int:pk>/language/update', user.api_views.UpdateLanguageView.as_view()),
     
 
-    path('registration/register/', user.api_views.register,),
-    path('registration/verify-registration/', user.api_views.verify_registration,),
+    path('registration/register/', user.api_views.RegisterView.as_view(),),
+    path('registration/verify-registration/', user.api_views.VerifyRegistrationView.as_view(),),
 
-    path('registration/send-reset-password-link/',user.api_views.send_reset_password_link),
-    path('registration/reset-password/', user.api_views.reset_password,),
+    path('registration/send-reset-password-link/',user.api_views.SendResetPasswordLinkView.as_view()),
+    path('registration/reset-password/', user.api_views.ResetPasswordView.as_view(),),
 
     path('unregister/', user.api_views.UserViewUnregister.as_view(),),
 

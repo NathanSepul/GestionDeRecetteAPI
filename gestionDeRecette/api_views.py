@@ -12,7 +12,6 @@ class MyLogin(TokenObtainPairView):
     @extend_schema(
         operation_id='Login',
         description='Connexion',
-        # security=[],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)

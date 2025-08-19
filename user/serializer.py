@@ -13,13 +13,12 @@ class UserBaseSerializer(serializers.ModelSerializer):
         fields = ['id' ]
 
 class UserSerializer(serializers.ModelSerializer):
-    fullname = serializers.SerializerMethodField(read_only=True)
     date_joined = serializers.DateTimeField(read_only=True)
     email = serializers.ReadOnlyField()
 
     class Meta:
         model = user.models.User
-        fields = ['id', 'email', 'first_name', 'last_name', 'fullname', 'date_joined', 'language']
+        fields = ['id', 'email', 'first_name', 'last_name', 'date_joined', 'language']
     
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -34,7 +33,6 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         data["refresh"] = str(refresh)
         data["access"] = str(refresh.access_token)
         data["user_id"] = str(self.user.id)
-        data["avatar"] = str(self.user.get_avatar_url())
 
         return data
 

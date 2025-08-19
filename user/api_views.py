@@ -2,26 +2,23 @@ import user.models
 from user.models import User
 import user.serializer
 from user.serializer import UserBaseSerializer
+
 from django.core.mail import send_mail
 from django.http import JsonResponse
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-
 from rest_framework_simplejwt.tokens import RefreshToken
-
 from rest_registration import signals
 from rest_registration.api.views.register import register as rest_register
 from rest_registration.api.views.register import process_verify_registration_data, VerifyRegistrationSerializer
 from rest_registration.api.views.reset_password import process_reset_password_data, ResetPasswordSerializer, send_reset_password_link as rest_send_reset_password_link
 from rest_registration.utils.responses import get_ok_response
 from rest_registration.settings import registration_settings
-# from rest_registration.decorators import ( api_view_serializer_class, api_view_serializer_class_getter )
-
 from rest_framework.views import APIView
 from django.template.loader import render_to_string
-
 from drf_spectacular.utils import extend_schema
+
 
 @extend_schema(tags=['Utilisateur'])
 class UserViewSet(generics.RetrieveAPIView):
@@ -116,74 +113,78 @@ class UpdateLanguageView(generics.UpdateAPIView):
 #
 
 @extend_schema(tags=['Utilisateur'])
-# @api_view_serializer_class(VerifyRegistrationSerializer)
-# @swagger_auto_schema(method='post', operation_id='Sign up email verify', security=[],)
-@api_view(['POST'])
-@permission_classes(registration_settings.NOT_AUTHENTICATED_PERMISSION_CLASSES)
-def verify_registration(request):
+class VerifyRegistrationView(generics.GenericAPIView):
     """
     Verify registration via signature.
     """
-    user = process_verify_registration_data(
+
+    serializer_class = VerifyRegistrationSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        user = process_verify_registration_data(
         request.data, serializer_context={'request': request})
 
-    signals.user_activated.send(sender=None, user=user, request=request)
-    extra_data = None
+        signals.user_activated.send(sender=None, user=user, request=request)
 
-    refresh = RefreshToken.for_user(user)
+        refresh = RefreshToken.for_user(user)
 
-    data = {}
-    data["user_id"] = str(user.id)
-    data["avatar"] = str(user.get_avatar_url())
-    data["refresh"] = str(refresh)
-    data["access"] = str(refresh.access_token)
+        data = {}
+        data["user_id"] = str(user.id)
+        data["refresh"] = str(refresh)
+        data["access"] = str(refresh.access_token)
 
-    return get_ok_response(data)
+        return get_ok_response(data)
 
 
 @extend_schema(tags=['Utilisateur'])
-# @api_view_serializer_class_getter(lambda: registration_settings.REGISTER_SERIALIZER_CLASS)
-# @swagger_auto_schema(method='post', operation_id='Sign up', security=[],)
-@api_view(['POST'])
-def register(request):
+class RegisterView(generics.GenericAPIView):
     '''
     Saves the user's data and sends an email (with signature, timestamp and ID ) to verify his identity
     '''
+    
+    serializer_class = registration_settings.REGISTER_SERIALIZER_CLASS
+    permission_classes = [permissions.AllowAny]
 
-    return rest_register(request._request)
-
-@extend_schema(tags=['Utilisateur'])
-# @api_view_serializer_class_getter(lambda: registration_settings.SEND_RESET_PASSWORD_LINK_SERIALIZER_CLASS)
-# @swagger_auto_schema(method='post', operation_id='Reset password send link', security=[],)
-@api_view(['POST'])
-def send_reset_password_link(request):
-    '''
-    Sends an email with signature, timestamp and ID to reset the password.
-    '''
-
-    return rest_send_reset_password_link(request._request)
+    def post(self, request, *args, **kwargs):
+       return rest_register(request._request)
 
 
 @extend_schema(tags=['Utilisateur'])
-# @api_view_serializer_class(ResetPasswordSerializer)
-@permission_classes(registration_settings.NOT_AUTHENTICATED_PERMISSION_CLASSES)
-# @swagger_auto_schema(method='post', operation_id='Reset password', security=[],)
-@api_view(['POST'])
-def reset_password(request):
+class SendResetPasswordLinkView(generics.GenericAPIView):
+    """
+    Sends an email with a signature, timestamp, and ID to reset the password.
+    """
+    
+    serializer_class = registration_settings.SEND_RESET_PASSWORD_LINK_SERIALIZER_CLASS
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        return rest_send_reset_password_link(request._request)
+    
+
+@extend_schema(tags=['Utilisateur'])
+class ResetPasswordView(generics.GenericAPIView):
     '''
     Reset password, given the signature and timestamp from the link.
     '''
-    process_reset_password_data(
-        request.data, serializer_context={'request': request})
+    
+    serializer_class = ResetPasswordSerializer
+    permission_classes = [permissions.AllowAny]
 
-    user = User.objects.all().get(id=request.data['user_id'])
-    refresh = RefreshToken.for_user(user)
+    def post(self, request, *args, **kwargs):
+        process_reset_password_data( request.data, serializer_context={'request': request})
 
-    data = {}
-    data["user_id"] = str(user.id)
-    data["avatar"] = str(user.get_avatar_url())
-    data["refresh"] = str(refresh)
-    data["access"] = str(refresh.access_token)
+        user = User.objects.all().get(id=request.data['user_id'])
+        refresh = RefreshToken.for_user(user)
 
-    return get_ok_response(data)
+        data = {}
+        data["user_id"] = str(user.id)
+        data["refresh"] = str(refresh)
+        data["access"] = str(refresh.access_token)
+
+        return get_ok_response(data)
+
+    
+    
 
