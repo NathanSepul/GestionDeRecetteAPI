@@ -23,7 +23,7 @@ class TagListAPIView(generics.ListAPIView):
         queryparam_Recette = self.request.GET.get('recetteId', '')
 
         if queryparam_Recette:
-            queryset = queryset.filter(tagrecette__recette=queryparam_Recette)
+            queryset = queryset.filter(recettes=queryparam_Recette)
             
         return queryset.order_by('tag')
 

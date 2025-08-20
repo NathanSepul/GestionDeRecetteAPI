@@ -66,9 +66,7 @@ class RecetteListAPIView(generics.ListAPIView):
                 tag_ids = list(set(int(tag_id.strip()) for tag_id in queryparam_tag.split(',') if tag_id.strip()))
                 
                 if tag_ids: 
-                    for tag_id in tag_ids:
-                        queryset = queryset.filter(tagrecette__tag__id=tag_id)
-                    
+                    queryset = queryset.filter(tag__in=tag_ids)
                     queryset = queryset.distinct()
                 else:
                     pass 

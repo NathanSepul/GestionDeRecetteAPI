@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block extend_title %}Connexion |{% endblock %}
+
+{% block content %}
+<div class="col-6 mx-auto pt-5">
+    {% if messages %}
+        <ul class="messages">
+            {% for message in messages %}
+            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <div class="border rounded p-4">
+        <h3 class="mb-5 text-center">Connection</h3>
+        <form action="{% url 'connexion' %}" method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <input type="text" required name="email" autofocus="false" placeholder="Email" class="form-control"
+                    id="id_username" value="{{form.email.value}}">
+                    {{ form.email.errors }}
+            </div>
+            
+            <div class="form-group">
+                <input type="password" name="password" autofocus="false" placeholder="Password" class="form-control"
+                    id="id_password">
+                    {{ form.password.errors }}
+            </div>
+            {{erroConnexion}}
+
+            <small class="d-block mt-4 text-center">
+                <a class="text-dark" href="{% url 'password_reset' %}">Mot de passe oublié ?</a>
+            </small>
+            <button type="submit" class="btn btn-lg btn-primary btn-round btn-block btn-loading shadow-sm mt-4">
+                Connexion
+            </button>
+        </form>
+        <hr class="my-5">
+        <small class="d-block text-center">
+            Pas encore de compte ?
+            <a class="text-primary" href="{% url 'register' %}">S'inscrire</a>
+        </small>
+    </div>
+</div>
+{% endblock %}

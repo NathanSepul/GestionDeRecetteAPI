@@ -22,7 +22,7 @@ DEBUG = env('DEBUG')
 if DEBUG :
     ALLOWED_HOSTS = ['*']
 else :
-    ALLOWED_HOSTS = ['sepul.be']
+    ALLOWED_HOSTS = ['localhost','sepul.be']
     
 
 
@@ -153,18 +153,31 @@ EMAIL_USE_SSL = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-# STATIC_URL = '/staticfiles/'
+STATIC_URL = '/staticfiles/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+STATICFILES_DIRS = (
+    os.path.join(BASE_DIR, 'static'),
+)
+STATICFILES_FINDERS = (
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+)
+
+# STATIC_URL = '/static/'
 # STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # STATICFILES_DIRS = (
 #     os.path.join(BASE_DIR, 'static'),
 # )
+
 # STATICFILES_FINDERS = (
 #     'django.contrib.staticfiles.finders.FileSystemFinder',
 #     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 # )
 
-STATIC_ROOT = 'static'
-STATIC_URL = '/static/'
+# STATIC_ROOT = 'static'
+# STATIC_URL = '/static/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -198,8 +211,8 @@ REST_REGISTRATION = {
     'REGISTER_EMAIL_VERIFICATION_ENABLED': False,
     'RESET_PASSWORD_VERIFICATION_ENABLED': True,
 
-    'REGISTER_VERIFICATION_URL': 'http://127.0.0.1:8000/registration/verify-email/',
-    'RESET_PASSWORD_VERIFICATION_URL': 'http://127.0.0.1:8000/reset-password/formulaire/',
+    'REGISTER_VERIFICATION_URL': 'sepul.be:8000/registration/verify-email/',
+    'RESET_PASSWORD_VERIFICATION_URL': 'sepul.be:8000/reset-password/formulaire/',
 
     'VERIFICATION_FROM_EMAIL': 'nathan@sepul.be',
 
