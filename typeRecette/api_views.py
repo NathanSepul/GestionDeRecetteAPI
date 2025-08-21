@@ -60,7 +60,6 @@ class TypeRecetteDeleteAPIView(generics.DestroyAPIView):
     serializer_class = typeRecette.serializer.TypeRecetteSerializer
 
     def delete(self, request, pk, format=None):
-        print("kkkkk")
         typeRecette = self.get_object()
         typeRecette.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)  
