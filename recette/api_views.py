@@ -9,7 +9,7 @@ from django.db import transaction
 from rest_framework.views import APIView 
 from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema
-
+import base64
 
 @extend_schema(tags=['Recette'])
 class RecetteListLiteAPIView(generics.ListAPIView):
@@ -22,6 +22,7 @@ class RecetteListLiteAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        queryset = queryset.filter(user_id=self.request.user.id)
         queryparam_TypeRecette = self.request.GET.get('typeRecetteId', '')
         
         if queryparam_TypeRecette:
@@ -37,7 +38,6 @@ class RecetteListAPIView(generics.ListAPIView):
 
     queryset = recette.models.Recette.objects.all()
     serializer_class = recette.serializer.RecetteSerializer
-    permission_classes = [AllowAny]
 
     @extend_schema(
         operation_id='get list recette',
@@ -49,6 +49,8 @@ class RecetteListAPIView(generics.ListAPIView):
     
     def get_queryset(self):
         queryset = super().get_queryset()
+
+        queryset = queryset.filter(user_id=self.request.user.id)
 
         queryparam_TypeRecette = self.request.GET.get('typeRecetteId', '')
         queryparam_OrderBy = self.request.GET.get('orderBy', '')
@@ -66,8 +68,10 @@ class RecetteListAPIView(generics.ListAPIView):
                 tag_ids = list(set(int(tag_id.strip()) for tag_id in queryparam_tag.split(',') if tag_id.strip()))
                 
                 if tag_ids: 
-                    queryset = queryset.filter(tag__in=tag_ids)
-                    queryset = queryset.distinct()
+                    # queryset = queryset.filter(tag__in=tag_ids)
+                    # queryset = queryset.distinct()
+                    for tag_id in tag_ids:
+                        queryset = queryset.filter(tag__id=tag_id)
                 else:
                     pass 
 
@@ -96,14 +100,15 @@ class RecetteRetrieveAPIView(generics.RetrieveAPIView):
 @extend_schema(tags=['Recette'])
 class RecetteCreateAPIView(generics.CreateAPIView):
     """
-    Create tag
+    Create Recette
     """
 
     queryset = recette.models.Recette.objects.all()
     serializer_class = recette.serializer.RecetteSerializer
 
     def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)    
+        return super().post(request, *args, **kwargs) 
+       
 @extend_schema(tags=['Recette'])
 class RecetteDeleteAPIView(generics.DestroyAPIView):
     queryset = recette.models.Recette.objects.all()
@@ -127,29 +132,23 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
                     ingredient.quantite = new_quantity.quantize(Decimal('0.01')) # Round to 2 decimal places
                     ingredient.save() # Save the updated ingredient
 
-    def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)    
-
-    def put(self, request, *args, **kwargs):
-        return super().put(request, *args, **kwargs)
-    
-    def update(self, request,  *args, **kwargs):
+    def update(self, request, *args, **kwargs):
         with transaction.atomic():
             try:
                 instance = self.get_object()
                 old_portion = instance.portion
 
+                image_base64_string = request.data.pop("image", None)
+                
                 serializer = self.get_serializer(instance, data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
 
-                image_data = request.data.get("image")
-                if image_data:
-                    # Convert the string to bytes before saving
-                    instance.image = image_data.encode('utf-8')
-                elif image_data is None:
+                if image_base64_string:
+                    instance.image = base64.b64decode(image_base64_string)
+                else:
                     instance.image = None
-
+                        
                 if request.data.get("adapteQuantity"):
                     if old_portion != 0: 
                         scaling_factor = instance.portion / old_portion    

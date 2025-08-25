@@ -188,7 +188,7 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': ('rest_framework.renderers.JSONRenderer',),
     
     'DEFAULT_PAGINATION_CLASS': 'gestionDeRecette.serializer.MyPagination',
-    'PAGE_SIZE': 5,
+    'PAGE_SIZE': 10,
 
     # 'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.AllowAny',),
     'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),

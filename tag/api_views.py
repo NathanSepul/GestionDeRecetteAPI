@@ -1,9 +1,12 @@
-from rest_framework import generics
+from rest_framework import generics, permissions
+from recette.models import Recette
 import tag
+from tag.models import Tag
 import tag.serializer
 from rest_framework.response import Response
 from rest_framework import status
 from drf_spectacular.utils import extend_schema
+from rest_framework.views import APIView 
 
 @extend_schema(tags=['Tag'])
 class TagListAPIView(generics.ListAPIView):
@@ -66,36 +69,51 @@ class TagDeleteAPIView(generics.DestroyAPIView):
 ########################
 ########################
 
+@extend_schema(tags=['Tag'])
+class TagRecetteListAPIView(generics.ListAPIView):
+    """
+    list of tags
+    """
 
-# class TagRecetteCreateAPIView(generics.CreateAPIView):
-#     """
-#     Create tag
-#     """
+    queryset = tag.models.Tag.objects.all()
+    serializer_class = tag.serializer.TagSerializer
+    paginator = None
 
-#     queryset = tag.models.TagRecette.objects.all()
-#     serializer_class = tag.serializer.TagRecetteSerializer
+    def get_queryset(self):
+        idRecette = self.kwargs.get('idRecette')
+        if not idRecette:
+            raise Response(status=status.HTTP_400_BAD_REQUEST)   
+        return Tag.objects.filter(recettes__id=idRecette).distinct()
 
-#     def post(self, request, *args, **kwargs):
-#         return super().post(request, *args, **kwargs)
 
-# class TagRecetteDeleteAPIView(generics.DestroyAPIView):
-#     queryset = tag.models.TagRecette.objects.all()
-#     serializer_class = tag.serializer.TagRecetteSerializer
+class TagRecetteCreateAPIView(APIView):
+    def post(self, request):
+        serializer = tag.serializer.TagRecetteLinkSerializer(data=request.data)
+        if serializer.is_valid():
+            recette_id = serializer.validated_data['recette_id']
+            tag_id = serializer.validated_data['tag_id']
 
-#     def delete(self, request, pk, format=None):
-#         tagReceette = self.get_object()
-#         tagReceette.delete()
-#         return Response(status=status.HTTP_204_NO_CONTENT)  
+            recette = Recette.objects.get(id=recette_id)
+            tagToLink = Tag.objects.get(id=tag_id)
 
-# class TagRecetteUpdateAPIView(generics.UpdateAPIView):
-#     queryset = tag.models.TagRecette.objects.all()
-#     serializer_class = tag.serializer.TagRecetteSerializer
+            tagToLink.recettes.add(recette) 
 
-#     def post(self, request, *args, **kwargs):
-#         return super().post(request, *args, **kwargs)    
+            return Response(status=status.HTTP_201_CREATED)   
 
-#     def put(self, request, *args, **kwargs):
-#         return super().put(request, *args, **kwargs)
-    
-#     def update(self, request,  *args, **kwargs):
-#         return super().update(request, *args, **kwargs)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class TagRecetteDeleteAPIView(generics.DestroyAPIView):
+    def delete(self, request):
+        serializer = tag.serializer.TagRecetteLinkSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            recette_id = serializer.validated_data['recette_id']
+            tag_id = serializer.validated_data['tag_id']
+
+            recette = Recette.objects.get(id=recette_id)
+            tagToRemove = Tag.objects.get(id=tag_id)
+            tagToRemove.recettes.remove(recette)
+
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

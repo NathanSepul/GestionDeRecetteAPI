@@ -1,11 +1,18 @@
 from django.contrib import admin
 import recette.models
-
+from django.utils.safestring import mark_safe
 
 @admin.register(recette.models.Recette)
 class RecetteAdminTopic(admin.ModelAdmin):
+    def get_image_preview(self, obj):
+        if obj.image_as_base64:
+            return mark_safe(f'<img src="data:image/jpeg;base64,{obj.image_as_base64}" width="100" />')
+        return "No Image"
+    
+    get_image_preview.short_description = 'Image'
+
     list_display = ( 'titre', 'portion', 'typeRecette')
-    readonly_fields =[ 'id','image']
+    readonly_fields =[ 'id','get_image_preview']
     list_filter = ('typeRecette',)
     list_per_page = 20
     search_fields = ('titre',)

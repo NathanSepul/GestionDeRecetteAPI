@@ -5,22 +5,27 @@ from rest_framework import  serializers
 import recette.models
 from django.db.models import Max
 
+from tag.models import Tag
+from user.serializer import UserSerializer
+
 class RecetteLiteSerializer(serializers.ModelSerializer):
     class Meta:
         model = recette.models.Recette
         fields = ['id', 'titre', 'typeRecette' ]
 
 class RecetteSerializer(serializers.ModelSerializer):
-    adapteQuantity = serializers.BooleanField(default=True)
+    adapteQuantity = serializers.BooleanField(default=True, write_only=True, required=False  )
+    image = serializers.CharField(required=False, allow_null=True, write_only=True)
+    
     class Meta:
         model = recette.models.Recette
-        fields = ['id', 'titre', 'portion', 'typeRecette','image', 'conseil', 'adapteQuantity' ]
+        fields = ['id', 'titre', 'portion', 'typeRecette','image','conseil', 'adapteQuantity','image_display' ]
     
-    def get_image(self, obj):
-        if obj.image:
-            return base64.b64encode(obj.image).decode('utf-8')
-        return None
-    
+    def create(self, validated_data):
+        validated_data.pop('adapteQuantity', None)
+        instance = recette.models.Recette.objects.create(user=self.context['request'].user, **validated_data)
+        return instance
+
 
 
 class IngredientSerializer(serializers.ModelSerializer):
@@ -68,3 +73,5 @@ class ReorderSerializer(serializers.Serializer):
     class Meta:
         model = recette.models.Ingredient
         fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette' ]
+
+
