@@ -51,7 +51,7 @@ class IngredientSerializer(serializers.ModelSerializer):
 class PreparationSerializer(serializers.ModelSerializer):
     class Meta:
         model = recette.models.Preparation
-        fields = ['id', 'noOrdre', 'description', 'isSection', 'description', 'recette' ]
+        fields = ['id', 'noOrdre', 'isSection', 'description', 'recette' ]
 
     def create(self, validated_data):
         recette_instance = validated_data.get('recette')
@@ -67,7 +67,7 @@ class PreparationSerializer(serializers.ModelSerializer):
         return obj
 
 
-class ReorderSerializer(serializers.Serializer):
+class ReorderIngredientSerializer(serializers.Serializer):
     newPosition = serializers.IntegerField(min_value=0)
 
     class Meta:
@@ -75,3 +75,9 @@ class ReorderSerializer(serializers.Serializer):
         fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette' ]
 
 
+class ReorderPreparationSerializer(serializers.Serializer):
+    newPosition = serializers.IntegerField(min_value=0)
+
+    class Meta:
+        model = recette.models.Preparation
+        fields = ['id', 'noOrdre', 'isSection', 'description', 'recette' ]

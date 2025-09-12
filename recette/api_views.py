@@ -210,7 +210,7 @@ class IngredientUpdateAPIView(generics.UpdateAPIView):
 @extend_schema(tags=['Ingredient'])
 class IngredientReorderAPIView(APIView):
     queryset = recette.models.Ingredient.objects.all()
-    serializer_class = recette.serializer.ReorderSerializer
+    serializer_class = recette.serializer.ReorderPreparationSerializer
 
     def get_queryset(self):
         return recette.models.Ingredient.objects.filter(recette__id=self.kwargs["pk"]).order_by('noOrdre')
@@ -221,35 +221,33 @@ class IngredientReorderAPIView(APIView):
             serializer.is_valid(raise_exception=True)
             new_position = serializer.validated_data["newPosition"]
 
-            ingredients_for_recette = self.get_queryset()    
-            ingredient_to_move = recette.models.Ingredient.objects.get(id=self.kwargs["pkIngredient"])
-            old_position = ingredient_to_move.noOrdre
-           
-            max_order = ingredients_for_recette[len(ingredients_for_recette)-1].noOrdre
-            if new_position < 0:
-                new_position = 0
-            if new_position > max_order:
-                new_position = max_order
+            with transaction.atomic():
+                ingredient_to_move = recette.models.Ingredient.objects.get(id=self.kwargs["pkIngredient"])
+               
+                ingredients_to_reorder = recette.models.Ingredient.objects.filter(
+                    recette_id=self.kwargs["pk"]
+                ).exclude(id=ingredient_to_move.id).order_by('noOrdre')
 
-            if old_position != new_position:
-                with transaction.atomic():
-                    if old_position < new_position:
-                        for ingredient in ingredients_for_recette.filter(noOrdre__gt=old_position, noOrdre__lte=new_position):
-                            ingredient.noOrdre -= 1
-                            ingredient.save() 
-                    else:
-                        for ingredient in ingredients_for_recette.filter(noOrdre__gte=new_position, noOrdre__lt=old_position):
-                            ingredient.noOrdre += 1
-                            ingredient.save() 
+                # On construit la nouvelle liste d'ingrédients
+                new_ordered_list = []
 
-                    ingredient_to_move.noOrdre = new_position
-                    ingredient_to_move.save()
+                if new_position == 0:
+                    new_ordered_list.append(ingredient_to_move)
 
-            updatedIngredients = self.get_queryset()             
-            serializer = recette.serializer.IngredientSerializer(updatedIngredients, many=True)
+                for i, ingredient in enumerate(ingredients_to_reorder):
+                    new_ordered_list.append(ingredient)
+                    if i + 1 == new_position:
+                        new_ordered_list.append(ingredient_to_move)
+
+                for index, ingredient in enumerate(new_ordered_list):
+                    ingredient.noOrdre = index
+                    ingredient.save()
+                    
+            serializer = recette.serializer.IngredientSerializer(new_ordered_list, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
+            print(e)
             return Response({"detail": f"Une erreur s'est produite lors de la réorganisation : {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
 
 @extend_schema(tags=['Ingredient'])
@@ -318,5 +316,50 @@ class PreparationUpdateAPIView(generics.UpdateAPIView):
     
     def update(self, request,  *args, **kwargs):
         return super().update(request, *args, **kwargs)
+
+
+    
+@extend_schema(tags=['Preparation'])
+class PreparationReorderAPIView(APIView):
+    queryset = recette.models.Preparation.objects.all()
+    serializer_class = recette.serializer.ReorderPreparationSerializer
+
+    def get_queryset(self):
+        return recette.models.Preparation.objects.filter(recette__id=self.kwargs["pk"]).order_by('noOrdre')
+    
+    def post(self, request, pk, pkPreparation, *args, **kwargs):
+        try:
+            serializer = self.serializer_class(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            new_position = serializer.validated_data["newPosition"]
+
+            with transaction.atomic():
+                preparation_to_move = recette.models.Preparation.objects.get(id=self.kwargs["pkPreparation"])
+               
+                preparations_to_reorder = recette.models.Preparation.objects.filter(
+                    recette_id=self.kwargs["pk"]
+                ).exclude(id=preparation_to_move.id).order_by('noOrdre')
+
+                new_ordered_list = []
+
+                if new_position == 0:
+                    new_ordered_list.append(preparation_to_move)
+
+                for i, preparation in enumerate(preparations_to_reorder):
+                    new_ordered_list.append(preparation)
+                    if i + 1 == new_position:
+                        new_ordered_list.append(preparation_to_move)
+
+                for index, preparation in enumerate(new_ordered_list):
+                    preparation.noOrdre = index
+                    preparation.save()
+                    
+            serializer = recette.serializer.PreparationSerializer(new_ordered_list, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print(e)
+            return Response({"detail": f"Une erreur s'est produite lors de la réorganisation : {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
+
 ############
 ###########

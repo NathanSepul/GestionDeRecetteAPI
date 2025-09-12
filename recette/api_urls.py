@@ -11,6 +11,7 @@ urlpatterns = [
     path('<int:pk>/update/',recette.api_views.RecetteUpdateAPIView.as_view()),
     path('<int:pk>/remove/',recette.api_views.RecetteDeleteAPIView.as_view()),
     path('<int:pk>/ingredient/reorder/<int:pkIngredient>/', recette.api_views.IngredientReorderAPIView.as_view()),
+    path('<int:pk>/preparation/reorder/<int:pkPreparation>/', recette.api_views.PreparationReorderAPIView.as_view()),
 
     path('<int:pk>/ingredient/', recette.api_views.IngredientRetrieveAPIView.as_view()),
     path('ingredient/create/', recette.api_views.IngredientCreateAPIView.as_view()),

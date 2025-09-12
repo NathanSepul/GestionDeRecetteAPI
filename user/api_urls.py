@@ -16,4 +16,5 @@ urlpatterns = [
     path('registration/reset-password/', user.api_views.ResetPasswordView.as_view(),),
     path('unregister/', user.api_views.UserViewUnregister.as_view(),),
 
+    path('', include("django.contrib.auth.urls")),
 ]
