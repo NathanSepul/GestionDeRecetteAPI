@@ -1,13 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import BaseUserManager, AbstractUser
-from django.urls import reverse
-from django.contrib.staticfiles.storage import staticfiles_storage
 from django.utils.translation import gettext_lazy as _
-import datetime
-from django.conf import settings
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from rest_framework.authtoken.models import Token
+
 
 # Custom Auth
 # https://docs.djangoproject.com/fr/3.2/topics/auth/customizing/#a-full-example
@@ -26,6 +20,18 @@ class UserManager(BaseUserManager):
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
+
+        import typeRecette.models
+        typeRecette.models.TypeRecette.objects.create( user=user,  noOrdre=1, type="Entrée")
+        typeRecette.models.TypeRecette.objects.create( user=user,  noOrdre=2, type="Plat")
+        typeRecette.models.TypeRecette.objects.create( user=user,  noOrdre=3, type="Dessert")
+
+        import tag.models
+        tag.models.Tag.objects.create( user=user, tag="Poisson", red=81, green=88, blue=192, opacite=210)
+        tag.models.Tag.objects.create( user=user, tag="Végétarien",  red=105, green=170, blue=0, opacite=210)
+        tag.models.Tag.objects.create( user=user, tag="Porc",  red=255, green=47, blue=0, opacite=82)
+        tag.models.Tag.objects.create( user=user, tag="Poulet",  red=255, green=0, blue=4, opacite=255)
+        
         return user
 
     def create_user(self, email, password=None, **extra_fields):

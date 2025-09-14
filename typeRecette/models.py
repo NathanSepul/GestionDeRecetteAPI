@@ -1,7 +1,7 @@
+import importlib
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from user.models import User
-
 
 class TypeRecette(models.Model):
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING, verbose_name=_("Utilisateur"))
