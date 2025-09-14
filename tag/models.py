@@ -1,7 +1,10 @@
 from django.db import models
 from recette.models import Recette
+from user.models import User
+from django.utils.translation import gettext_lazy as _
 
 class Tag(models.Model):
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, verbose_name=_("Utilisateur"))
     tag = models.CharField(max_length=100)
     recettes= models.ManyToManyField(Recette)
     opacite = models.IntegerField()

@@ -23,6 +23,7 @@ class TagListAPIView(generics.ListAPIView):
     
     def get_queryset(self):
         queryset = super().get_queryset()
+        queryset = queryset.filter(user_id=self.request.user.id)
         queryparam_Recette = self.request.GET.get('recetteId', '')
 
         if queryparam_Recette:
@@ -83,7 +84,7 @@ class TagRecetteListAPIView(generics.ListAPIView):
         idRecette = self.kwargs.get('idRecette')
         if not idRecette:
             raise Response(status=status.HTTP_400_BAD_REQUEST)   
-        return Tag.objects.filter(recettes__id=idRecette).distinct()
+        return Tag.objects.filter(recettes__id=idRecette).filter(user_id=self.request.user.id).distinct()
 
 
 class TagRecetteCreateAPIView(APIView):

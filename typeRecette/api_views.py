@@ -26,7 +26,7 @@ class TypeRecetteListAPIView(generics.ListAPIView):
         Return the list of type recette
         """
         queryset = super().get_queryset()
-
+        queryset = queryset.filter(user_id=self.request.user.id)
         return queryset.order_by('noOrdre')
 
 @extend_schema(tags=['Type de recette'])
@@ -80,7 +80,7 @@ class TypeRecetteReorderAPIView(APIView):
 
             with transaction.atomic():
                 type_to_move = typeRecette.models.TypeRecette.objects.get(id=self.kwargs["pk"])
-                type_to_reorder = typeRecette.models.TypeRecette.objects.exclude(id=type_to_move.id).order_by('noOrdre')
+                type_to_reorder = typeRecette.models.TypeRecette.objects.filter(user_id=self.request.user.id).exclude(id=type_to_move.id).order_by('noOrdre')
 
                 new_ordered_list = []
 

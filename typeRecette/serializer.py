@@ -14,8 +14,8 @@ class TypeRecetteSerializer(serializers.ModelSerializer):
         max_no_ordre =  typeRecette.models.TypeRecette.objects.aggregate(Max('noOrdre'))['noOrdre__max']
         next_no_ordre = (max_no_ordre or 0) + 1
         validated_data['noOrdre'] = next_no_ordre
-        obj = typeRecette.models.TypeRecette.objects.create(**validated_data)
-        return obj
+        instance = typeRecette.models.TypeRecette.objects.create(user=self.context['request'].user, **validated_data)
+        return instance
 
 class ReorderTypeRecetteSerializer(serializers.Serializer):
     newPosition = serializers.IntegerField(min_value=0)
