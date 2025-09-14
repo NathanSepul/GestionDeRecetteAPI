@@ -2,6 +2,7 @@ from decimal import Decimal
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework import status
+from gestionDeRecette.serializer import MyPagination
 import recette
 import recette.models
 import recette.serializer
@@ -84,18 +85,59 @@ class RecetteListAPIView(generics.ListAPIView):
         else:
             return queryset.order_by('titre')
         
+
 @extend_schema(tags=['Recette'])
-class RecetteRetrieveAPIView(generics.RetrieveAPIView):
+class RecetteSinglePageAPIView(generics.GenericAPIView):
     """
-    Returns the **selected** Recette informations.
+    get single page recette
     """
 
     queryset = recette.models.Recette.objects.all()
     serializer_class = recette.serializer.RecetteSerializer
 
-    # @swagger_auto_schema(operation_id='Get recette by id', security=[],)
     def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
+        queryset = self.get_queryset()  
+        serializer = self.get_serializer(queryset) 
+        return Response(serializer.data)
+
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        queryset = queryset.filter(user_id=self.request.user.id)
+
+        queryparam_TypeRecette = self.request.GET.get('typeRecetteId', '')
+        queryparam_OrderBy = self.request.GET.get('orderBy', '')
+        queryparam_searchTitre = self.request.GET.get('searchTitre', '')
+        queryparam_tag = self.request.GET.get('tags')
+        queryparam_page = int(self.request.GET.get('page'))
+
+        if queryparam_TypeRecette:
+            queryset = queryset.filter(typeRecette=queryparam_TypeRecette)
+    
+        if queryparam_searchTitre:
+            queryset = queryset.filter(titre__icontains=queryparam_searchTitre)
+
+        if queryparam_tag:
+            try:
+                tag_ids = list(set(int(tag_id.strip()) for tag_id in queryparam_tag.split(',') if tag_id.strip()))
+                
+                if tag_ids: 
+                    # queryset = queryset.filter(tag__in=tag_ids)
+                    # queryset = queryset.distinct()
+                    for tag_id in tag_ids:
+                        queryset = queryset.filter(tag__id=tag_id)
+                else:
+                    pass 
+
+            except ValueError:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"tags": "Les IDs de tags doivent être des entiers séparés par des virgules."})
+        
+        if queryparam_OrderBy:
+            return queryset.order_by(queryparam_OrderBy)[queryparam_page]
+        else:
+            return queryset.order_by('titre')[queryparam_page]
     
 @extend_schema(tags=['Recette'])
 class RecetteCreateAPIView(generics.CreateAPIView):
@@ -158,7 +200,8 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
                 return Response("Recette updated", status=status.HTTP_200_OK)
             except Exception as e:
                return Response(f"An error occurred during update recette: {e}", status=status.HTTP_400_BAD_REQUEST)
-                
+
+
 ########################
 ########################
 
@@ -247,7 +290,6 @@ class IngredientReorderAPIView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            print(e)
             return Response({"detail": f"Une erreur s'est produite lors de la réorganisation : {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
 
 @extend_schema(tags=['Ingredient'])
@@ -358,7 +400,6 @@ class PreparationReorderAPIView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            print(e)
             return Response({"detail": f"Une erreur s'est produite lors de la réorganisation : {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
 
 ############

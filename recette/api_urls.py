@@ -6,7 +6,7 @@ import recette.api_views
 urlpatterns = [
 
     path('',recette.api_views.RecetteListAPIView.as_view()),
-    path('<int:pk>/', recette.api_views.RecetteRetrieveAPIView.as_view()),
+    path('singlePage/',recette.api_views.RecetteSinglePageAPIView.as_view()),
     path('create/', recette.api_views.RecetteCreateAPIView.as_view()),
     path('<int:pk>/update/',recette.api_views.RecetteUpdateAPIView.as_view()),
     path('<int:pk>/remove/',recette.api_views.RecetteDeleteAPIView.as_view()),

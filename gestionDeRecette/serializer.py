@@ -8,11 +8,14 @@ import math
 
 class MyPagination(pagination.PageNumberPagination):
 
+    page_size_query_param = 'pageSize'
+    
     def get_paginated_response(self, data):
         return Response({
             'next': self.page.has_next(),
             'previous': self.page.has_previous(),
             'current': self.page.number,
+            'count': self.page.paginator.count - 1,
             'results': data})
     
     def paginate_queryset(self, queryset, request, view=None):

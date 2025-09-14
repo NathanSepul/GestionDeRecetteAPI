@@ -72,9 +72,6 @@ class TypeRecetteReorderAPIView(APIView):
     queryset = typeRecette.models.TypeRecette.objects.all()
     serializer_class = typeRecette.serializer.ReorderTypeRecetteSerializer
 
-    def get_queryset(self):
-        return typeRecette.models.TypeRecette.objects.filter(typeRecette__id=self.kwargs["pk"]).order_by('noOrdre')
-    
     def post(self, request, pk, *args, **kwargs):
         try:
             serializer = self.serializer_class(data=request.data)
@@ -93,7 +90,7 @@ class TypeRecetteReorderAPIView(APIView):
                 for i, type in enumerate(type_to_reorder):
                     new_ordered_list.append(type)
                     if i + 1 == new_position:
-                        new_ordered_list.append(type_to_reorder)
+                        new_ordered_list.append(type_to_move)
 
                 for index, type in enumerate(new_ordered_list):
                     type.noOrdre = index
@@ -103,5 +100,4 @@ class TypeRecetteReorderAPIView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            print(e)
             return Response({"detail": f"Une erreur s'est produite lors de la réorganisation : {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
