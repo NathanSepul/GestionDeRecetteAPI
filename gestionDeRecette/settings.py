@@ -211,8 +211,8 @@ REST_REGISTRATION = {
     'REGISTER_EMAIL_VERIFICATION_ENABLED': False,
     'RESET_PASSWORD_VERIFICATION_ENABLED': True,
 
-    'REGISTER_VERIFICATION_URL': '192.168.0.16:8000/api/user/registration/verify-email/',
-    'RESET_PASSWORD_VERIFICATION_URL': '192.168.0.16:8000/api/user/reset-password/formulaire/',
+    'REGISTER_VERIFICATION_URL': 'sepul.be:8000/api/user/registration/verify-email/',
+    'RESET_PASSWORD_VERIFICATION_URL': 'sepul.be:8000/api/user/reset-password/formulaire/',
 
     'VERIFICATION_FROM_EMAIL': 'nathan@sepul.be',
 
