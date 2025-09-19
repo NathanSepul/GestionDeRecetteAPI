@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from user.models import User
 
 class TypeRecette(models.Model):
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, verbose_name=_("Utilisateur"))
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name=_("Utilisateur"))
     noOrdre = models.IntegerField(db_column='noOrdre', blank=True, null=True) 
     type = models.CharField(max_length=10, blank=False, null=False)
 

@@ -1,5 +1,4 @@
 {% load static i18n %}
-{% load render_bundle from webpack_loader %}
 {% get_current_language as LANGUAGE_CODE %}
 
 <!doctype html>
@@ -13,24 +12,16 @@
         content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no' />
 
     <!-- Optional CSS -->
-    <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.0-2/css/all.min.css" integrity="sha256-46r060N2LrChLLb5zowXQ72/iKKNiw/lAmygmHExk/o=" crossorigin="anonymous" />
-
+   
     <!-- Main CSS -->
-    {% render_bundle 'main' 'css' %}
-
-    {% block extend_css %}{% endblock %}
+   
 
 
     <title>{% block extend_title %}{% endblock %}ReadMeAStory</title>
 </head>
 
 <body>
-    <header>
-        <nav class="navbar navbar-dark bg-dark">
-            <span class="navbar-brand mb-0 h1"><a class="text-light" href="{% url 'home' %}">Django Forum</a></span>
-        </nav>
-    </header>
+    
 
     <div class="content">
         {% block content %}
@@ -47,8 +38,6 @@
     <script type="text/javascript" src="{% static 'js/intercooler-1.2.3.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'bootstrap/js/bootstrap.min.js' %}"></script>
 
-    <!-- Main JS -->
-   {% render_bundle 'main' 'js' %}
 
     {% block extend_javascript %}{% endblock %}
 </body>

@@ -5,7 +5,7 @@ from user.models import User
 from django.utils.translation import gettext_lazy as _
 
 class Recette(models.Model):
-    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, verbose_name=_("Utilisateur"))
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name=_("Utilisateur"))
     titre = models.CharField(max_length=100)
     portion = models.IntegerField(blank=False, null=False)
     typeRecette = models.ForeignKey(TypeRecette, models.DO_NOTHING)

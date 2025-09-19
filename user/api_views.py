@@ -19,6 +19,7 @@ from rest_framework.views import APIView
 from django.template.loader import render_to_string
 from drf_spectacular.utils import extend_schema
 
+from django.shortcuts import render, redirect
 
 @extend_schema(tags=['Utilisateur'])
 class UserViewSet(generics.RetrieveAPIView):
@@ -112,6 +113,11 @@ class UpdateLanguageView(generics.UpdateAPIView):
 # Re ecriture des methodes de django rest registration pour avoir les access et refresh token et pour la documenation de l'api
 #
 
+@extend_schema(tags=['Utilisateur'])
+def VerifyEmailView(request):
+    return render(request, 'registration/verify_email.html')
+
+    
 @extend_schema(tags=['Utilisateur'])
 class VerifyRegistrationView(generics.GenericAPIView):
     """
