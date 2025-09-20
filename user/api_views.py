@@ -5,7 +5,7 @@ from user.serializer import UserBaseSerializer
 
 from django.core.mail import send_mail
 from django.http import JsonResponse
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
