@@ -39,8 +39,8 @@ class Produit(models.Model):
 class Unite(models.Model):
     code = models.TextField(max_length=5)
     description = models.TextField()
-    borneSuperieur = models.IntegerField(null=True)
-    uniteSuperieur = models.ForeignKey('self', on_delete=models.DO_NOTHING, verbose_name=_("Unité superieur"),null=True)
+    borneSuperieur = models.IntegerField(blank=True,null=True)
+    uniteSuperieur = models.ForeignKey('self', on_delete=models.DO_NOTHING, verbose_name=_("Unité superieur"),blank=True,null=True)
 
     class Meta:
         db_table = 'unite'

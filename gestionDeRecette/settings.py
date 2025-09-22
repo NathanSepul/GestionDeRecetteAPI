@@ -23,7 +23,11 @@ if DEBUG :
     ALLOWED_HOSTS = ['*']
 else :
     ALLOWED_HOSTS = ['localhost','sepul.be']
-    
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://sepul.be:8000',
+    'http://localhost:8000',
+]
 
 
 # Application definition
