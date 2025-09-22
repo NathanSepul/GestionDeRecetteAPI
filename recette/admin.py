@@ -37,7 +37,7 @@ class RecetteAdmin(admin.ModelAdmin):
 
 @admin.register(recette.models.Ingredient)
 class IngredientAdmin(admin.ModelAdmin):
-    list_display = ( 'noOrdre','quantite', 'nom', 'isSection' ,'recette')
+    list_display = ( 'noOrdre','quantite', 'nom', 'isSection' ,'unite','recette')
     readonly_fields =[ 'id',]
     list_per_page = 20
     search_fields = ('nom',)

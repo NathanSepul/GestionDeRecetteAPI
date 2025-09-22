@@ -30,6 +30,7 @@ class Recette(models.Model):
 class Produit(models.Model):
     nom = models.TextField()
     nomPluriel =  models.TextField()
+    determinant = models.TextField(max_length=5, blank=True, null=True)
 
     class Meta:
         db_table = 'produit'
@@ -59,6 +60,7 @@ class Ingredient(models.Model):
     quantite = models.DecimalField(max_digits=9, decimal_places=2, blank=True, null=True)
     nom = models.TextField()
     unite  = models.ForeignKey(Unite, models.DO_NOTHING, null=True)
+    produit = models.ForeignKey(Produit, models.DO_NOTHING, null=True)
 
     class Meta:
         db_table = 'ingredient'
