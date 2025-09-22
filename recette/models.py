@@ -1,4 +1,5 @@
 import base64
+from typing import Optional
 from django.db import models
 from typeRecette.models import TypeRecette
 from user.models import User
@@ -21,12 +22,35 @@ class Recette(models.Model):
     def __str__(self):
         return self.titre
 
-    def image_display(self):
+    def image_display(self) -> Optional[str]:
         if self.image:
             return base64.b64encode(self.image).decode('utf-8')
         return None
     
+class Produit(models.Model):
+    nom = models.TextField()
+    nomPluriel =  models.TextField()
 
+    class Meta:
+        db_table = 'produit'
+        verbose_name = "produit"
+        verbose_name_plural = "produits"
+
+class Unite(models.Model):
+    code = models.TextField(max_length=5)
+    description = models.TextField()
+    borneSuperieur = models.IntegerField(null=True)
+    uniteSuperieur = models.ForeignKey('self', on_delete=models.DO_NOTHING, verbose_name=_("Unité superieur"),null=True)
+
+    class Meta:
+        db_table = 'unite'
+        verbose_name = "unité"
+        verbose_name_plural = "unités"
+    
+    def __str__(self):
+        if (len(self.description) > 30):
+            return "%s..." % self.description[:30]
+        return self.description
 
 class Ingredient(models.Model):
     recette = models.ForeignKey(Recette,on_delete= models.CASCADE, verbose_name=_("Recette"))
@@ -34,6 +58,7 @@ class Ingredient(models.Model):
     isSection = models.BooleanField(default=False) 
     quantite = models.DecimalField(max_digits=9, decimal_places=2, blank=True, null=True)
     nom = models.TextField()
+    unite  = models.ForeignKey(Unite, models.DO_NOTHING, null=True)
 
     class Meta:
         db_table = 'ingredient'
@@ -57,3 +82,4 @@ class Preparation(models.Model):
         if (len(self.description) > 30):
             return "%s..." % self.description[:30]
         return self.description
+    

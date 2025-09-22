@@ -87,7 +87,9 @@ class TagRecetteListAPIView(generics.ListAPIView):
         return Tag.objects.filter(recettes__id=idRecette).filter(user_id=self.request.user.id).distinct()
 
 
-class TagRecetteCreateAPIView(APIView):
+class TagRecetteCreateAPIView(generics.CreateAPIView):
+    queryset = tag.models.Tag.objects.all()
+    serializer_class = tag.serializer.TagSerializer
     def post(self, request):
         serializer = tag.serializer.TagRecetteLinkSerializer(data=request.data)
         if serializer.is_valid():
@@ -104,6 +106,8 @@ class TagRecetteCreateAPIView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class TagRecetteDeleteAPIView(generics.DestroyAPIView):
+    queryset = tag.models.Tag.objects.all()
+    serializer_class = tag.serializer.TagSerializer
     def delete(self, request):
         serializer = tag.serializer.TagRecetteLinkSerializer(data=request.data)
         

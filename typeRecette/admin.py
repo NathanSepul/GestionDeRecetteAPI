@@ -3,7 +3,7 @@ import typeRecette.models
 
 
 @admin.register(typeRecette.models.TypeRecette)
-class TypeRecetteAdminTopic(admin.ModelAdmin):
+class TypeRecetteAdmin(admin.ModelAdmin):
     list_display = ('noOrdre', 'type',)
     # list_filter = ("noOrdre", )
     # list_per_page = 20
