@@ -24,12 +24,6 @@ if DEBUG :
 else :
     ALLOWED_HOSTS = ['localhost','sepul.be']
 
-CSRF_TRUSTED_ORIGINS = [
-    'http://sepul.be:8000',
-    'http://localhost:8000',
-]
-
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -63,10 +57,15 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'gestionDeRecette.urls'
 
+# Nécessaire pour que Django fasse confiance au proxy Nginx
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 CSRF_USE_SESSIONS = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://sepul.be',
+]
 
 TEMPLATES = [
     {
