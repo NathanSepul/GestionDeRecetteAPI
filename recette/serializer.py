@@ -27,11 +27,35 @@ class RecetteSerializer(serializers.ModelSerializer):
         return instance
 
 
+# 
+# ----------------------------------
+# ----------------------------------
+#
+
+class ProduitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = recette.models.Produit
+        fields = ['id', 'nom', 'nomPluriel', 'determinant' ]
+
+class UniteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = recette.models.Unite
+        fields = ['id', 'code', 'description']#, 'borneSuperieur', 'uniteSuperieur_id' ] 
+
+
+# 
+# ----------------------------------
+# ----------------------------------
+# 
 
 class IngredientSerializer(serializers.ModelSerializer):
+    produit = ProduitSerializer(read_only=True)
+    unite = UniteSerializer(read_only=True) 
+
+
     class Meta:
         model = recette.models.Ingredient
-        fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette' ]
+        fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette', 'unite', 'produit']
 
     def create(self, validated_data):
         recette_instance = validated_data.get('recette')
@@ -45,8 +69,18 @@ class IngredientSerializer(serializers.ModelSerializer):
 
         obj = recette.models.Ingredient.objects.create(**validated_data)
         return obj
-    
 
+class ReorderIngredientSerializer(serializers.Serializer):
+    newPosition = serializers.IntegerField(min_value=0)
+
+    class Meta:
+        model = recette.models.Ingredient
+        fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette', 'produit_id', 'unite_id' ]
+
+# 
+# ----------------------------------
+# ----------------------------------
+#
 
 class PreparationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -67,17 +101,11 @@ class PreparationSerializer(serializers.ModelSerializer):
         return obj
 
 
-class ReorderIngredientSerializer(serializers.Serializer):
-    newPosition = serializers.IntegerField(min_value=0)
-
-    class Meta:
-        model = recette.models.Ingredient
-        fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette' ]
-
-
 class ReorderPreparationSerializer(serializers.Serializer):
     newPosition = serializers.IntegerField(min_value=0)
 
     class Meta:
         model = recette.models.Preparation
         fields = ['id', 'noOrdre', 'isSection', 'description', 'recette' ]
+
+

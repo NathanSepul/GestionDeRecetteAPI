@@ -36,6 +36,9 @@ class Produit(models.Model):
         db_table = 'produit'
         verbose_name = "produit"
         verbose_name_plural = "produits"
+    
+    def __str__(self):
+        return self.nom
 
 class Unite(models.Model):
     code = models.TextField(max_length=5)
@@ -66,6 +69,7 @@ class Ingredient(models.Model):
         db_table = 'ingredient'
         verbose_name = "ingredient"
         verbose_name_plural = "ingredients"
+    
     
     
 

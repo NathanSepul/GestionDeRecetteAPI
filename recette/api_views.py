@@ -205,6 +205,7 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
 ########################
 ########################
 
+
 @extend_schema(tags=['Ingredient'])
 class IngredientRetrieveAPIView(generics.ListAPIView):
     """
@@ -302,8 +303,10 @@ class IngredientDeleteAPIView(generics.DestroyAPIView):
         ingredient.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 ########################
 ########################
+
 
 @extend_schema(tags=['Preparation'])
 class PreparationRetrieveAPIView(generics.ListAPIView):
@@ -402,5 +405,43 @@ class PreparationReorderAPIView(APIView):
         except Exception as e:
             return Response({"detail": f"Une erreur s'est produite lors de la réorganisation : {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
 
+
 ############
 ###########
+
+
+@extend_schema(tags=['Produit'])
+class ProduitListAPIView(generics.ListAPIView):
+    queryset = recette.models.Produit.objects.all()
+    serializer_class = recette.serializer.ProduitSerializer
+    paginator = None
+
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        queryparam_produit = self.request.GET.get('searchProduit', '')
+        
+        if queryparam_produit:
+            queryset = queryset.filter(nom__icontains=queryparam_produit)
+        
+        return queryset.order_by('nom')
+    
+
+############
+###########
+
+
+@extend_schema(tags=['Unite'])
+class UniteListAPIView(generics.ListAPIView):
+    queryset = recette.models.Unite.objects.all()
+    serializer_class = recette.serializer.UniteSerializer
+    paginator = None
+
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.order_by('code')
