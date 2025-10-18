@@ -30,7 +30,7 @@ class Recette(models.Model):
 class Produit(models.Model):
     nom = models.TextField()
     nomPluriel =  models.TextField()
-    determinant = models.TextField(max_length=5, blank=True, null=True)
+    produitDeBase = models.ForeignKey('self', on_delete=models.DO_NOTHING, verbose_name=_("Produit de base"),blank=True,null=True)
 
     class Meta:
         db_table = 'produit'

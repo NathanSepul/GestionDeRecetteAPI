@@ -4,7 +4,7 @@ from django.utils.safestring import mark_safe
 
 @admin.register(recette.models.Produit)
 class ProduitAdmin(admin.ModelAdmin):
-    list_display = ( 'nom','nomPluriel')
+    list_display = ( 'nom','nomPluriel','produitDeBase')
     readonly_fields =[ 'id',]
     list_per_page = 20
     search_fields = ('nom',)

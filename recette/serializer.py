@@ -35,7 +35,7 @@ class RecetteSerializer(serializers.ModelSerializer):
 class ProduitSerializer(serializers.ModelSerializer):
     class Meta:
         model = recette.models.Produit
-        fields = ['id', 'nom', 'nomPluriel', 'determinant' ]
+        fields = ['id', 'nom', 'nomPluriel' ]
 
 class UniteSerializer(serializers.ModelSerializer):
     class Meta:
