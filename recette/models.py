@@ -5,6 +5,7 @@ from typeRecette.models import TypeRecette
 from user.models import User
 from django.utils.translation import gettext_lazy as _
 
+
 class Recette(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name=_("Utilisateur"))
     titre = models.CharField(max_length=100)
@@ -26,6 +27,8 @@ class Recette(models.Model):
         if self.image:
             return base64.b64encode(self.image).decode('utf-8')
         return None
+    
+   
     
 class Produit(models.Model):
     nom = models.TextField()
