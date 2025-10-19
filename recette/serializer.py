@@ -49,13 +49,14 @@ class UniteSerializer(serializers.ModelSerializer):
 # 
 
 class IngredientSerializer(serializers.ModelSerializer):
-    produit = ProduitSerializer(read_only=True)
-    unite = UniteSerializer(read_only=True) 
+    produit_detail = ProduitSerializer(source='produit', read_only=True)
+    unite_detail = UniteSerializer(source='unite', read_only=True)
 
 
     class Meta:
         model = recette.models.Ingredient
-        fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette', 'unite', 'produit']
+        fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette','unite', 'produit','unite_detail', 'produit_detail']
+    
 
     def create(self, validated_data):
         recette_instance = validated_data.get('recette')
@@ -75,7 +76,7 @@ class ReorderIngredientSerializer(serializers.Serializer):
 
     class Meta:
         model = recette.models.Ingredient
-        fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette', 'produit_id', 'unite_id' ]
+        fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette', 'produit', 'unite' ]
 
 # 
 # ----------------------------------

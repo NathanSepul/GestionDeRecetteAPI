@@ -81,9 +81,9 @@ class Ingredient(models.Model):
     noOrdre = models.IntegerField()  
     isSection = models.BooleanField(default=False) 
     quantite = models.DecimalField(max_digits=9, decimal_places=2, blank=True, null=True)
-    nom = models.TextField(null=True)
-    unite  = models.ForeignKey(Unite, models.DO_NOTHING, null=True)
-    produit = models.ForeignKey(Produit, models.DO_NOTHING, null=True)
+    nom = models.TextField(blank=True,null=True)
+    unite  = models.ForeignKey(Unite, models.DO_NOTHING, blank=True, null=True)
+    produit = models.ForeignKey(Produit, models.DO_NOTHING, blank=True, null=True)
 
     class Meta:
         db_table = 'ingredient'
