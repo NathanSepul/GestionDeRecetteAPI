@@ -2,13 +2,11 @@ from decimal import Decimal
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework import status
-from gestionDeRecette.serializer import MyPagination
 import recette
 import recette.models
 import recette.serializer
 from django.db import transaction
 from rest_framework.views import APIView 
-from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema
 import base64
 
@@ -167,12 +165,15 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
     serializer_class = recette.serializer.RecetteSerializer
 
     def _adapt_ingredient_quantities(self, recette_instance, scaling_factor):
+        scaling_factor_decimal = Decimal(scaling_factor)
+
         if 1 != scaling_factor:
-            for ingredient in recette_instance.ingredients.all():
+            for ingredient in recette_instance.ingredient_set.all():
                 if ingredient.quantite is not None and not ingredient.isSection:
-                    new_quantity = ingredient.quantite * scaling_factor
+                    new_quantity = ingredient.quantite * scaling_factor_decimal
                     ingredient.quantite = new_quantity.quantize(Decimal('0.01')) # Round to 2 decimal places
                     ingredient.save() # Save the updated ingredient
+
 
     def update(self, request, *args, **kwargs):
         with transaction.atomic():
@@ -181,6 +182,7 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
                 old_portion = instance.portion
 
                 image_base64_string = request.data.pop("image", None)
+                adapte_quantity =request.data.pop("adapteQuantity", None)
                 
                 serializer = self.get_serializer(instance, data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
@@ -191,10 +193,9 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
                 else:
                     instance.image = None
                         
-                if request.data.get("adapteQuantity"):
-                    if old_portion != 0: 
-                        scaling_factor = instance.portion / old_portion    
-                        self._adapt_ingredient_quantities(instance, scaling_factor)
+                if adapte_quantity and old_portion != 0:
+                    scaling_factor = instance.portion / old_portion    
+                    self._adapt_ingredient_quantities(instance, scaling_factor)
 
                 instance.save()
                 return Response("Recette updated", status=status.HTTP_200_OK)
