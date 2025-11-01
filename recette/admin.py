@@ -23,7 +23,7 @@ class RecetteAdmin(admin.ModelAdmin):
  
     list_display = ( 'titre', 'portion', 'typeRecette')
     readonly_fields =[ 'id','image_tag']
-    list_filter = ('typeRecette',)
+    list_filter = ('typeRecette','user')
     list_per_page = 20
     search_fields = ('titre',)
     ordering = ('titre', )
@@ -34,7 +34,8 @@ class IngredientAdmin(admin.ModelAdmin):
     list_display = ( 'produit','quantite','unite',  'isSection', 'nom', 'recette')
     readonly_fields =[ 'id',]
     list_per_page = 20
-    search_fields = ('nom',)
+    search_fields = ['nom', 'produit__nom','recette__titre']
+    list_filter = ('isSection','recette__user',)
     ordering = ('recette', 'noOrdre')
     raw_id_fields = ('produit',)
 

@@ -11,7 +11,7 @@ class Recette(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name=_("Utilisateur"))
     titre = models.CharField(max_length=100)
     portion = models.IntegerField(blank=False, null=False)
-    typeRecette = models.ForeignKey(TypeRecette, models.DO_NOTHING)
+    typeRecette = models.ForeignKey(TypeRecette, models.DO_NOTHING, verbose_name=_("Type de recette"))
     image = models.BinaryField(blank=True, null=True)
     conseil = models.TextField(blank=True, null=True)
 
@@ -48,7 +48,7 @@ class Recette(models.Model):
    
     
 class Produit(models.Model):
-    nom = models.TextField()
+    nom = models.TextField(unique=True)
     nomPluriel =  models.TextField()
     produitDeBase = models.ForeignKey('self', on_delete=models.DO_NOTHING, verbose_name=_("Produit de base"),blank=True,null=True)
     determinant =  models.TextField(max_length=5,blank=True,null=True)
