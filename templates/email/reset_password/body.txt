@@ -1,6 +1,6 @@
 Cher(e) {{user.first_name}},
 
-Vous avez demandé la réinitialisation de votre mot de passe sur l'ISL Forum. Afin de procéder à cette réinitialisation, veuillez cliquer sur le lien ci-dessous :
+Vous avez demandé la réinitialisation de votre mot de passe sur Gestion de recette. Afin de procéder à cette réinitialisation, veuillez cliquer sur le lien ci-dessous :
 
 {{ verification_url | safe }}
 
@@ -13,4 +13,5 @@ Si vous avez des questions ou besoin d'assistance, veuillez contacter notre équ
 Nous vous remercions pour votre confiance et nous restons à votre disposition pour toute aide supplémentaire.
 
 Cordialement,
-L'équipe de l'ISL Forum
+L'équipe de Gestion de recette
+nathan@sepul.be

@@ -12,7 +12,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_registration import signals
 from rest_registration.api.views.register import register as rest_register
 from rest_registration.api.views.register import process_verify_registration_data, VerifyRegistrationSerializer
-from rest_registration.api.views.reset_password import process_reset_password_data, ResetPasswordSerializer, send_reset_password_link as rest_send_reset_password_link
+from rest_registration.api.views.reset_password import process_reset_password_data, ResetPasswordSerializer, send_reset_password_link
 from rest_registration.utils.responses import get_ok_response
 from rest_registration.settings import registration_settings
 from rest_framework.views import APIView
@@ -166,7 +166,7 @@ class SendResetPasswordLinkView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
-        return rest_send_reset_password_link(request._request)
+        return send_reset_password_link(request._request)
     
 
 @extend_schema(tags=['Utilisateur'])
