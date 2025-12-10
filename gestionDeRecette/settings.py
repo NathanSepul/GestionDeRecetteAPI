@@ -43,9 +43,11 @@ INSTALLED_APPS = [
     'rest_registration',
     'rest_framework_simplejwt',
     'drf_spectacular',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -62,6 +64,11 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 CSRF_USE_SESSIONS = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_TRUSTED_ORIGINS =  ['https://sepul.be', 'https://www.sepul.be']
+
+if DEBUG :
+    CORS_ALLOW_ALL_ORIGINS = True
+else :
+    CORS_ALLOWED_ORIGINS = [ "https://sepul.be",]
 
 TEMPLATES = [
     {
