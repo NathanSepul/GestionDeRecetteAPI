@@ -65,10 +65,10 @@ CSRF_USE_SESSIONS = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_TRUSTED_ORIGINS =  ['https://sepul.be', 'https://www.sepul.be']
 
-if DEBUG :
-    CORS_ALLOW_ALL_ORIGINS = True
-else :
-    CORS_ALLOWED_ORIGINS = [ "https://sepul.be",]
+# if DEBUG :
+#     CORS_ALLOW_ALL_ORIGINS = True
+# else :
+#     CORS_ALLOWED_ORIGINS = [ "https://sepul.be",]
 
 TEMPLATES = [
     {
