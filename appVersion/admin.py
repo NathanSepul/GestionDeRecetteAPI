@@ -51,20 +51,18 @@ class AppVersionAdmin(admin.ModelAdmin):
                     print("creation dossier")
                     os.makedirs(dossier_destination, exist_ok=True)
                 
-                chemin_complet = os.path.join(dossier_destination, f"{settings.env('APP_NAME')}.{obj.support}")
+                chemin_complet = os.path.join(dossier_destination, f"{settings.APP_NAME}.{obj.support}")
                 
                 if os.path.exists(chemin_complet):
                     print("rename old")
                     date_str = datetime.now().strftime('%Y%m%d_%H%M')
-                    nouveau_chemin_ancien = os.path.join(dossier_destination, f"{settings.env('APP_NAME')}_{date_str}.{obj.support}")
+                    nouveau_chemin_ancien = os.path.join(dossier_destination, f"{settings.APP_NAME}_{date_str}.{obj.support}")
                     os.rename(chemin_complet, nouveau_chemin_ancien)
 
                 fs = FileSystemStorage(location=dossier_destination)
-                fs.save(f"{settings.env('APP_NAME')}.{obj.support}", fichier)
+                fs.save(f"{settings.APP_NAME}.{obj.support}", fichier)
 
             super().save_model(request, obj, form, change)
         except Exception as e:
             print(f"!!! ERREUR UPLOAD : {str(e)}")
-            from django.contrib import messages
-            messages.error(request, f"Erreur lors de l'enregistrement : {e}")
-            raise e
+            
