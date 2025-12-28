@@ -64,5 +64,7 @@ class AppVersionAdmin(admin.ModelAdmin):
 
             super().save_model(request, obj, form, change)
         except Exception as e:
-            from requests import Response
-            return Response({"detail": f"Une erreur s'est produite lors de l'enregistrement : {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
+            print(f"!!! ERREUR UPLOAD : {str(e)}")
+            from django.contrib import messages
+            messages.error(request, f"Erreur lors de l'enregistrement : {e}")
+            raise e
