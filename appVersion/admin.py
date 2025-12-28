@@ -4,11 +4,10 @@ from django.core.exceptions import ValidationError
 from django.contrib import admin
 from django import forms
 from django.core.files.storage import FileSystemStorage
-from requests import Response
-import appVersion.models
 from gestionDeRecette import settings
 from django.conf import settings
 from rest_framework import status
+import appVersion.models
 
 class AppVersionAdminForm(forms.ModelForm):
     app_file = forms.FileField(
@@ -65,4 +64,5 @@ class AppVersionAdmin(admin.ModelAdmin):
 
             super().save_model(request, obj, form, change)
         except Exception as e:
+            from requests import Response
             return Response({"detail": f"Une erreur s'est produite lors de l'enregistrement : {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
