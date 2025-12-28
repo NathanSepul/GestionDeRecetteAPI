@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'typeRecette',
     'recette',
     'tag',
+    'appVersion',
 # 
     'rest_framework',
     'rest_registration',

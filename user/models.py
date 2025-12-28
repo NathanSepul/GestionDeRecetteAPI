@@ -54,10 +54,10 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractUser):
-    LANGUAGES = {
+    LANGUAGES = (
         ('fr', 'Francais'),
         ('en', 'Anglais'),
-    }
+    )
 
     email = models.EmailField(verbose_name=_( "Adresse Email"), max_length=255, unique=True,)
     first_name = models.CharField(verbose_name=_("Prénom"), max_length=255,)

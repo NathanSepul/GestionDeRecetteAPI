@@ -1,3 +1,4 @@
+from appVersion.views import download_apk
 from .admin import admin
 from gestionDeRecette.api_views import MyLogin, MyTokenRefreshView, MyTokenVerifyView
 from django.conf import settings
@@ -24,7 +25,7 @@ urlpatterns = (
     api_urlpattern
     + [
        path("admin/", admin.site.urls),
-        
+        path("download/apk", download_apk, name='download_apk'),
         path('schema/', SpectacularAPIView.as_view(), name='schema'),
         path('swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     ]
