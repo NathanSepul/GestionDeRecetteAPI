@@ -1,18 +1,25 @@
 import os
 from django import forms
 from django.conf import settings
-from django.http import FileResponse, Http404, HttpResponseRedirect
-from django.shortcuts import render
+from django.http import FileResponse, Http404, HttpResponse
+from django.contrib.auth.decorators import login_required
 
+
+# @login_required
 def download_apk(request):
-    # Chemin vers votre fichier APK
-    path_to_file = os.path.join(settings.MEDIA_ROOT, 'uploads/apk',f"{settings.APP_NAME}.apk")
-    print(path_to_file)
+    filename = f"{settings.APP_NAME}.apk"
+    path_to_file = os.path.join(settings.MEDIA_ROOT, 'uploads/apk',filename)
+    if not os.path.exists(path_to_file):
+        raise Http404("Le fichier APK est introuvable.")
+
+    # VERSION PRO : On laisse Nginx servir le fichier
+    # L'URL interne doit correspondre à la config Nginx ci-dessous
+    response = HttpResponse()
+    response['Content-Type'] = 'application/vnd.android.package-archive'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
-    if os.path.exists(path_to_file):
-        # 'as_attachment=True' force le téléchargement sur le GSM
-        response = FileResponse(open(path_to_file, 'rb'), content_type='application/vnd.android.package-archive')
-        response['Content-Disposition'] = 'attachment; filename="Mes recette.apk"'
-        return response
+    # Nginx intercepte cet en-tête et sert le fichier lui-même
+    # Attention : le chemin doit être relatif à ce que Nginx voit
+    response['X-Accel-Redirect'] = f'/internal-media/uploads/apk/{filename}'
     
-    raise Http404("Le fichier APK est introuvable.")
+    return response
