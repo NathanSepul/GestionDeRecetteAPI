@@ -6,8 +6,8 @@ from django.shortcuts import render
 
 def download_apk(request):
     # Chemin vers votre fichier APK
-    path_to_file = os.path.join(settings.MEDIA_ROOT, 'uploads/apk/app-release.apk')
-    print(os.path.join(settings.MEDIA_ROOT, 'uploads/apk/app-release.apk'))
+    path_to_file = os.path.join(settings.MEDIA_ROOT, 'uploads/apk',f"{settings.APP_NAME}.apk")
+    print(path_to_file)
     
     if os.path.exists(path_to_file):
         # 'as_attachment=True' force le téléchargement sur le GSM
