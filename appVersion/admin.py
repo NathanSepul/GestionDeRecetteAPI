@@ -27,12 +27,13 @@ class AppVersionAdminForm(forms.ModelForm):
         fichier = cleaned_data.get('app_file')
         
         if support and fichier:
-            extension = fichier.name.lower().split('.', 1)[1]
-
-            if extension in "{support}.zip":
+            nom_fichier = fichier.name.lower()
+            extension_attendue = f"{support.lower()}.zip"
+            
+            if not nom_fichier.endswith(extension_attendue):
                 raise ValidationError(
                     f"Erreur d'extension : Pour le support sélectionné, "
-                    f"le fichier doit être un '{support}.zip' reçu: '{extension}'."
+                    f"le fichier doit être un '{support}.zip' reçu: '{extension_attendue}'."
                 )
         
         return cleaned_data
