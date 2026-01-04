@@ -12,4 +12,4 @@ class AppVersion(models.Model):
     support = models.CharField( max_length=8, choices=supportEnum, unique=True )
 
     def __str__(self):
-        return f"Version {self.version_number} "
+        return f"Version {self.get_support_display()} {self.version_number} "

@@ -17,7 +17,7 @@ class DownloadAPIView(APIView):
 
     @extend_schema(tags=['AppVersion'])
     def get(self, request,support):
-        filename = f"{settings.APP_NAME}.{support}"
+        filename = f"{settings.APP_NAME}.{support}.zip"
         path_to_file = os.path.join(settings.MEDIA_ROOT, f'uploads/{support}', filename)
 
         # 2. Vérification de l'existence

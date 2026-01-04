@@ -14,6 +14,7 @@ class AppVersionAdminForm(forms.ModelForm):
         required=True, 
         label="Application",
         help_text="Le fichier doit correspondre au support sélectionné."
+
     )
 
     class Meta:
@@ -24,14 +25,14 @@ class AppVersionAdminForm(forms.ModelForm):
         cleaned_data = super().clean()
         support = cleaned_data.get('support')
         fichier = cleaned_data.get('app_file')
-
+        
         if support and fichier:
-            extension = os.path.splitext(fichier.name)[1].lower().replace('.', '')
-            
-            if extension != support:
+            extension = fichier.name.lower().split('.', 1)[1]
+
+            if extension in "{support}.zip":
                 raise ValidationError(
                     f"Erreur d'extension : Pour le support sélectionné, "
-                    f"le fichier doit être un '.{support}' (reçu: '.{extension}')."
+                    f"le fichier doit être un '{support}.zip' reçu: '{extension}'."
                 )
         
         return cleaned_data
@@ -46,23 +47,22 @@ class AppVersionAdmin(admin.ModelAdmin):
             
             if fichier:
                 dossier_destination = os.path.join(settings.MEDIA_ROOT, 'uploads', obj.support)
-
-                if not os.path.exists(dossier_destination):
-                    print("creation dossier")
-                    os.makedirs(dossier_destination, exist_ok=True)
+                os.makedirs(dossier_destination, exist_ok=True)
                 
-                chemin_complet = os.path.join(dossier_destination, f"{settings.APP_NAME}.{obj.support}")
+                nom_final = f"{settings.APP_NAME}.{obj.support}.zip"
+                chemin_complet = os.path.join(dossier_destination, nom_final)
                 
                 if os.path.exists(chemin_complet):
-                    print("rename old")
                     date_str = datetime.now().strftime('%Y%m%d_%H%M')
-                    nouveau_chemin_ancien = os.path.join(dossier_destination, f"{settings.APP_NAME}_{date_str}.{obj.support}")
-                    os.rename(chemin_complet, nouveau_chemin_ancien)
+                    ancien_nom = f"{settings.APP_NAME}_{date_str}.{obj.support}.zip"
+                    os.rename(chemin_complet, os.path.join(dossier_destination, ancien_nom))
 
                 fs = FileSystemStorage(location=dossier_destination)
-                fs.save(f"{settings.APP_NAME}.{obj.support}", fichier)
+
+                fs.save(f"{settings.APP_NAME}.{obj.support}.zip", fichier)
 
             super().save_model(request, obj, form, change)
         except Exception as e:
-            print(f"!!! ERREUR UPLOAD : {str(e)}")
+            from django.contrib import messages
+            messages.error(request, f"Erreur lors de l'upload : {e}")
             
