@@ -26,7 +26,7 @@ class DownloadAPIView(APIView):
 
         # 3. Préparation de la réponse
         response = HttpResponse()
-        response['Content-Type'] = 'application/vnd.android.package-archive'
+        response['Content-Type'] = 'application/zip'
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         
         # 4. Optimisation Nginx (X-Accel-Redirect)
