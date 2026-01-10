@@ -171,36 +171,42 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
     serializer_class = recette.serializer.RecetteSerializer
 
     def _adapt_ingredient_quantities(self, recette_instance, scaling_factor):
-        scaling_factor_decimal = Decimal(scaling_factor)
+        scaling_factor_decimal = Decimal(str(scaling_factor))
 
-        if 1 != scaling_factor:
+        if Decimal(1) != scaling_factor:
             for ingredient in recette_instance.ingredient_set.all():
                 if ingredient.quantite is not None and not ingredient.isSection:
                     new_quantity = ingredient.quantite * scaling_factor_decimal
                     ingredient.quantite = new_quantity.quantize(Decimal('0.01')) # Round to 2 decimal places
-                    ingredient.save() # Save the updated ingredient
+                    ingredient.save()
 
 
     def update(self, request, *args, **kwargs):
-        with transaction.atomic():
-            try:
+        try:    
+            with transaction.atomic():
                 instance = self.get_object()
                 old_portion = instance.portion
 
-                adapte_quantity =request.data.pop("adapteQuantity", None)
+                data = request.data.copy()
+                adapte_quantity =data.pop("adapteQuantity", None)[0]
+                adapte_quantity =  str(adapte_quantity)=='true'
                 
-                serializer = self.get_serializer(instance, data=request.data, partial=True)
+                serializer = self.get_serializer(instance, data=data, partial=True)
                 serializer.is_valid(raise_exception=True)
-                serializer.save()
                         
+                updated_instance = serializer.save()
+                
                 if adapte_quantity and old_portion != 0:
-                    scaling_factor = instance.portion / old_portion    
-                    self._adapt_ingredient_quantities(instance, scaling_factor)
-
-                instance.save()
-                return Response("Recette updated", status=status.HTTP_200_OK)
-            except Exception as e:
-               return Response(f"An error occurred during update recette: {e}", status=status.HTTP_400_BAD_REQUEST)
+                    new_portion = updated_instance.portion
+                    if new_portion != old_portion:
+                        scaling_factor = new_portion / old_portion    
+                        self._adapt_ingredient_quantities(updated_instance, scaling_factor)
+                        
+                updated_instance.refresh_from_db()
+                
+                return Response(self.get_serializer(updated_instance).data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(f"An error occurred during update recette: {e}", status=status.HTTP_400_BAD_REQUEST)
 
 
 ########################

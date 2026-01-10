@@ -1,6 +1,7 @@
 import base64
 import os
 from typing import Optional
+import uuid
 from django.db import models
 from typeRecette.models import TypeRecette
 from user.models import User
@@ -14,7 +15,8 @@ from django.dispatch import receiver
 def path_and_rename(instance, filename):
         ext = filename.split('.')[-1]
         clean_name = slugify(instance.titre)
-        new_filename = f"{clean_name}.{ext}"
+        unique_id = uuid.uuid4().hex[:8]
+        new_filename = f"{clean_name}_{unique_id}.{ext}"
         return os.path.join('photos/', new_filename)
 
 class Recette(models.Model):

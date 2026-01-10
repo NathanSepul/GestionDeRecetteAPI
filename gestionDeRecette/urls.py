@@ -6,7 +6,6 @@ from django.urls import path, include, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 api_urlpattern = [
-    re_path(r'^media/(?P<path>.*)$', serve_image, name='serve_image'),
     path("api/typeRecette/", include("typeRecette.api_urls")),
     path("api/recette/", include("recette.api_urls")),
     path("api/tag/", include("tag.api_urls")),
@@ -19,7 +18,10 @@ api_urlpattern = [
 ]
 
 
-
+if settings.DEBUG:
+    api_urlpattern += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+else:
+    api_urlpattern += [re_path(r'^media/(?P<path>.*)$', serve_image, name='serve_image')]
 
 urlpatterns = (
     api_urlpattern
@@ -31,6 +33,3 @@ urlpatterns = (
     
 )+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
-# Uniquement en développement (DEBUG=True)
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
