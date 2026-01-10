@@ -17,19 +17,19 @@ api_urlpattern = [
     path("api/token/verify/", MyTokenVerifyView.as_view(), name="token_verify"),
 ]
 
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path('schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+]
+
+urlpatterns += api_urlpattern
 
 if settings.DEBUG:
-    api_urlpattern += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 else:
-    api_urlpattern += [re_path(r'^media/(?P<path>.*)$', serve_image, name='serve_image')]
-
-urlpatterns = (
-    api_urlpattern
-    + [
-        path("admin/", admin.site.urls),
-        path('schema/', SpectacularAPIView.as_view(), name='schema'),
-        path('swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    urlpatterns += [
+        re_path(r'^media/(?P<path>.*)$', serve_image, name='serve_image'),
     ]
-    
-)+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
