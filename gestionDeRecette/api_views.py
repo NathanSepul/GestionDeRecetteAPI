@@ -1,3 +1,4 @@
+from django.http import HttpResponse, HttpResponseForbidden
 from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema
 from rest_framework_simplejwt.views import (
@@ -35,3 +36,12 @@ class MyTokenVerifyView(TokenVerifyView):
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
+
+def serve_image(request, path):
+    if not request.user.is_authenticated:
+        return HttpResponseForbidden()
+
+    response = HttpResponse()
+    response['X-Accel-Redirect'] = f'/internal-media/{path}'
+    response['Content-type'] = ""
+    return response
