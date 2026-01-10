@@ -1,11 +1,18 @@
 import base64
+import os
 from typing import Optional
 from django.db import models
 from typeRecette.models import TypeRecette
 from user.models import User
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from django.utils.text import slugify
 
+def path_and_rename(instance, filename):
+        ext = filename.split('.')[-1]
+        clean_name = slugify(instance.titre)
+        new_filename = f"{clean_name}.{ext}"
+        return os.path.join('photos/', new_filename)
 
 class Recette(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name=_("Utilisateur"))
@@ -13,6 +20,7 @@ class Recette(models.Model):
     portion = models.IntegerField(blank=False, null=False)
     typeRecette = models.ForeignKey(TypeRecette, models.DO_NOTHING, verbose_name=_("Type de recette"))
     image = models.BinaryField(blank=True, null=True)
+    imagefield = models.ImageField(upload_to=path_and_rename, blank=True, null=True,)
     conseil = models.TextField(blank=True, null=True)
 
     class Meta:
@@ -23,27 +31,18 @@ class Recette(models.Model):
     
     def __str__(self):
         return self.titre
-
+    
     def image_display(self) -> Optional[str]:
         if self.image:
             return base64.b64encode(self.image).decode('utf-8')
         return None
     
-    def image_tag(self) -> Optional[str]:
-        if self.image:
-            # 1. Convertir les données binaires en Base64
-            base64_data = base64.b64encode(self.image).decode('utf-8')
-            
-            # 2. Créer l'URL de données (data URI)
-            # Nous supposons que l'image est un JPEG ou que le type MIME est approprié
-            data_uri = f'data:image/jpeg;base64,{base64_data}'
-            
-            # 3. Utiliser format_html pour générer la balise <img>
-            return format_html('<img src="{}" style="max-width: 150px; max-height: 150px;" />', data_uri)
-        
+    def image_preview(self):
+        if self.imagefield:
+            return format_html('<img src="{}" style="width: 100px; height: auto; border-radius: 5px;" />', self.imagefield.url)
         return "Pas d'image"
-
-    image_tag.short_description = 'Aperçu de l\'image'
+    
+    image_preview.short_description = 'Aperçu'
     
    
     

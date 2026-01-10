@@ -5,10 +5,14 @@ from rest_framework import status
 import recette
 import recette.models
 import recette.serializer
+import os
 from django.db import transaction
 from rest_framework.views import APIView 
 from drf_spectacular.utils import extend_schema
 import base64
+from django.utils.text import slugify
+from django.core.files.base import ContentFile
+from rest_framework import permissions
 
 @extend_schema(tags=['Recette'])
 class RecetteListLiteAPIView(generics.ListAPIView):
@@ -78,6 +82,8 @@ class RecetteListAPIView(generics.ListAPIView):
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError({"tags": "Les IDs de tags doivent être des entiers séparés par des virgules."})
 
+        
+       
         if queryparam_OrderBy:
             return queryset.order_by(queryparam_OrderBy)
         else:
@@ -446,3 +452,34 @@ class UniteListAPIView(generics.ListAPIView):
     def get_queryset(self):
         queryset = super().get_queryset()
         return queryset.order_by('code')
+    
+
+
+
+@extend_schema(tags=['Recette'])
+class convert(generics.ListAPIView):
+    permission_classes = [permissions.AllowAny,]
+    queryset = recette.models.Recette.objects.all()
+    serializer_class = recette.serializer.RecetteSerializer
+    paginator = None
+    @extend_schema(
+        operation_id='get list recette',
+        description='get list recette',
+        # security=[],
+    )   
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        for obj in queryset:
+            if obj.image: # l'ancien champ binaire
+
+                # ext = filename.split('.')[-1]
+                clean_name = slugify(obj.titre)
+                new_filename = f"{clean_name}.jpg"#{ext}"
+                # return os.path.join('photos/', new_filename)
+                obj.imagefield.save(new_filename, ContentFile(obj.image), save=True)
+        return queryset
+        

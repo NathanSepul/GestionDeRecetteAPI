@@ -22,7 +22,7 @@ class UniteAdmin(admin.ModelAdmin):
 class RecetteAdmin(admin.ModelAdmin):
  
     list_display = ( 'titre', 'portion', 'typeRecette')
-    readonly_fields =[ 'id','image_tag']
+    readonly_fields =[ 'id','image_preview']
     list_filter = ('typeRecette','user')
     list_per_page = 20
     search_fields = ('titre',)

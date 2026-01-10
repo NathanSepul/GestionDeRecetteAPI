@@ -13,6 +13,8 @@ urlpatterns = [
     path('<int:pk>/ingredient/reorder/<int:pkIngredient>/', recette.api_views.IngredientReorderAPIView.as_view()),
     path('<int:pk>/preparation/reorder/<int:pkPreparation>/', recette.api_views.PreparationReorderAPIView.as_view()),
 
+    # path('convert',recette.api_views.convert.as_view()),
+
     path('produit/',recette.api_views.ProduitListAPIView.as_view()),
     path('unite/',recette.api_views.UniteListAPIView.as_view()),
 
