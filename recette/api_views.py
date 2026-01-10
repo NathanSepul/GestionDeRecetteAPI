@@ -187,17 +187,11 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
                 instance = self.get_object()
                 old_portion = instance.portion
 
-                image_base64_string = request.data.pop("image", None)
                 adapte_quantity =request.data.pop("adapteQuantity", None)
                 
                 serializer = self.get_serializer(instance, data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
-
-                if image_base64_string:
-                    instance.image = base64.b64decode(image_base64_string)
-                else:
-                    instance.image = None
                         
                 if adapte_quantity and old_portion != 0:
                     scaling_factor = instance.portion / old_portion    

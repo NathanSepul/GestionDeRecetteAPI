@@ -7,6 +7,9 @@ from user.models import User
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.text import slugify
+from django.contrib.staticfiles.storage import staticfiles_storage
+from django.db.models.signals import post_delete, pre_save
+from django.dispatch import receiver
 
 def path_and_rename(instance, filename):
         ext = filename.split('.')[-1]
@@ -19,8 +22,8 @@ class Recette(models.Model):
     titre = models.CharField(max_length=100)
     portion = models.IntegerField(blank=False, null=False)
     typeRecette = models.ForeignKey(TypeRecette, models.DO_NOTHING, verbose_name=_("Type de recette"))
-    image = models.BinaryField(blank=True, null=True)
-    imagefield = models.ImageField(upload_to=path_and_rename, blank=True, null=True,)
+    imageOld = models.BinaryField(blank=True, null=True)
+    image = models.ImageField(upload_to=path_and_rename, blank=True, null=True,)
     conseil = models.TextField(blank=True, null=True)
 
     class Meta:
@@ -32,18 +35,40 @@ class Recette(models.Model):
     def __str__(self):
         return self.titre
     
-    def image_display(self) -> Optional[str]:
-        if self.image:
-            return base64.b64encode(self.image).decode('utf-8')
-        return None
-    
     def image_preview(self):
-        if self.imagefield:
-            return format_html('<img src="{}" style="width: 100px; height: auto; border-radius: 5px;" />', self.imagefield.url)
+        if self.image:
+            return format_html('<img src="{}" style="width: 100px; height: auto; border-radius: 5px;" />', self.image.url)
         return "Pas d'image"
     
     image_preview.short_description = 'Aperçu'
-    
+
+    def get_imageField_url(self):
+        if self.image and self.image.file:
+            return self.image.url
+        return staticfiles_storage.url('photos/{0}.png',self.titre)
+
+@receiver(post_delete, sender=Recette)
+def auto_delete_file_on_delete(sender, instance, **kwargs):
+    """Supprime le fichier du disque quand la recette est supprimée de la base."""
+    if instance.image:
+        if os.path.isfile(instance.image.path):
+            os.remove(instance.image.path)
+
+@receiver(pre_save, sender=Recette)
+def auto_delete_file_on_change(sender, instance, **kwargs):
+    """Supprime l'ancien fichier quand une nouvelle image est téléchargée."""
+    if not instance.pk:
+        return False
+
+    try:
+        old_file = Recette.objects.get(pk=instance.pk).image
+    except Recette.DoesNotExist:
+        return False
+
+    new_file = instance.image
+    if old_file and old_file != new_file:
+        if os.path.isfile(old_file.path):
+            os.remove(old_file.path)
    
     
 class Produit(models.Model):

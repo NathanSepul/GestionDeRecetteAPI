@@ -30,8 +30,7 @@ class DownloadAPIView(APIView):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         
         # 4. Optimisation Nginx (X-Accel-Redirect)
-        # Note : On utilise généralement le paramètre 'support' pour router vers le bon fichier si nécessaire
-        response['X-Accel-Redirect'] = f'/internal-media/uploads/{support}/{filename}'
+        response['X-Accel-Redirect'] = f'/media/uploads/{support}/{filename}'
         
         return response
 

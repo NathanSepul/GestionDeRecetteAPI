@@ -15,16 +15,19 @@ class RecetteLiteSerializer(serializers.ModelSerializer):
 
 class RecetteSerializer(serializers.ModelSerializer):
     adapteQuantity = serializers.BooleanField(default=True, write_only=True, required=False  )
-    image = serializers.CharField(required=False, allow_null=True, write_only=True)
+    imageNew = serializers.ImageField( required=False, max_length=None, use_url=True)
     
     class Meta:
         model = recette.models.Recette
-        fields = ['id', 'titre', 'portion', 'typeRecette','image','conseil', 'adapteQuantity','image_display' ]
+        fields = ['id', 'titre', 'portion', 'typeRecette','imageNew','conseil', 'adapteQuantity' ]
     
     def create(self, validated_data):
         validated_data.pop('adapteQuantity', None)
         instance = recette.models.Recette.objects.create(user=self.context['request'].user, **validated_data)
         return instance
+
+    def get_imagefield_url(self, obj):
+        return obj.get_imagefield_url()
 
 
 # 
