@@ -6,6 +6,7 @@ from django.urls import path, include, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 api_urlpattern = [
+    re_path(r'^media/(?P<path>.*)$', serve_image, name='serve_image'),
     path("api/typeRecette/", include("typeRecette.api_urls")),
     path("api/recette/", include("recette.api_urls")),
     path("api/tag/", include("tag.api_urls")),
@@ -21,7 +22,6 @@ api_urlpattern = [
 
 
 urlpatterns = (
-    re_path(r'^media/(?P<path>.*)$', serve_image, name='serve_image'),
     api_urlpattern
     + [
         path("admin/", admin.site.urls),
