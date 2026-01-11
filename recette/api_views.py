@@ -1,64 +1,45 @@
 from decimal import Decimal
-from rest_framework import generics
-from rest_framework.response import Response
-from rest_framework import status
-import recette
-import recette.models
-import recette.serializer
-import os
 from django.db import transaction
-from rest_framework.views import APIView 
 from drf_spectacular.utils import extend_schema
-import base64
-from django.utils.text import slugify
-from django.core.files.base import ContentFile
-from rest_framework import permissions
+from rest_framework import viewsets, status, generics, permissions
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from recette.models import *
+from recette.serializer import  *
+from django.db.models import Max
 
-@extend_schema(tags=['Recette'])
-class RecetteListLiteAPIView(generics.ListAPIView):
-    queryset = recette.models.Recette.objects.all()
-    serializer_class = recette.serializer.RecetteLiteSerializer
-    paginator = None
-
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        queryset = queryset.filter(user_id=self.request.user.id)
-        queryparam_TypeRecette = self.request.GET.get('typeRecetteId', '')
-        
-        if queryparam_TypeRecette:
-            queryset = queryset.filter(typeRecette=queryparam_TypeRecette)
-        
-        return queryset.order_by('titre')
-
-@extend_schema(tags=['Recette'])
-class RecetteListAPIView(generics.ListAPIView):
+class IsOwner(permissions.BasePermission):
     """
-    list of recette
+    Permission permettant de ne laisser que le propriétaire modifier l'objet.
     """
-
-    queryset = recette.models.Recette.objects.all()
-    serializer_class = recette.serializer.RecetteSerializer
-
-    @extend_schema(
-        operation_id='get list recette',
-        description='get list recette',
-        # security=[],
-    )   
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
+    def has_object_permission(self, request, view, obj):
+        if hasattr(obj, 'user'):
+            return obj.user == request.user
+        
+        if hasattr(obj, 'recette'):
+            return obj.recette.user == request.user
+            
+        return False
+    
+@extend_schema(tags=['Recette'])
+class RecetteViewSet(viewsets.ModelViewSet):
+    queryset = Recette.objects.all()
+    serializer_class = RecetteSerializer
+    permission_classes = [permissions.IsAuthenticated, IsOwner]
     
     def get_queryset(self):
         queryset = super().get_queryset()
 
-        queryset = queryset.filter(user_id=self.request.user.id)
-
+        # queryset = queryset.filter(user_id=self.request.user.id)
+        
+        queryparam_UserId = self.request.GET.get('userId', '')
         queryparam_TypeRecette = self.request.GET.get('typeRecetteId', '')
         queryparam_OrderBy = self.request.GET.get('orderBy', '')
         queryparam_searchTitre = self.request.GET.get('searchTitre', '')
         queryparam_tag = self.request.GET.get('tags')
+        
+        if queryparam_UserId:
+            queryset = queryset.filter(user_id=queryparam_UserId)
         
         if queryparam_TypeRecette:
             queryset = queryset.filter(typeRecette=queryparam_TypeRecette)
@@ -71,8 +52,6 @@ class RecetteListAPIView(generics.ListAPIView):
                 tag_ids = list(set(int(tag_id.strip()) for tag_id in queryparam_tag.split(',') if tag_id.strip()))
                 
                 if tag_ids: 
-                    # queryset = queryset.filter(tag__in=tag_ids)
-                    # queryset = queryset.distinct()
                     for tag_id in tag_ids:
                         queryset = queryset.filter(tag__id=tag_id)
                 else:
@@ -81,7 +60,6 @@ class RecetteListAPIView(generics.ListAPIView):
             except ValueError:
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError({"tags": "Les IDs de tags doivent être des entiers séparés par des virgules."})
-
         
        
         if queryparam_OrderBy:
@@ -89,87 +67,28 @@ class RecetteListAPIView(generics.ListAPIView):
         else:
             return queryset.order_by('titre')
         
-
-@extend_schema(tags=['Recette'])
-class RecetteSinglePageAPIView(generics.GenericAPIView):
-    """
-    get single page recette
-    """
-
-    queryset = recette.models.Recette.objects.all()
-    serializer_class = recette.serializer.RecetteSerializer
-
-    def get(self, request, *args, **kwargs):
-        queryset = self.get_queryset()  
-        serializer = self.get_serializer(queryset) 
-        return Response(serializer.data)
-
-    
-    def get_queryset(self):
-        queryset = super().get_queryset()
-
-        queryset = queryset.filter(user_id=self.request.user.id)
-
-        queryparam_TypeRecette = self.request.GET.get('typeRecetteId', '')
-        queryparam_OrderBy = self.request.GET.get('orderBy', '')
-        queryparam_searchTitre = self.request.GET.get('searchTitre', '')
-        queryparam_tag = self.request.GET.get('tags')
-        queryparam_page = int(self.request.GET.get('page'))
-
-        if queryparam_TypeRecette:
-            queryset = queryset.filter(typeRecette=queryparam_TypeRecette)
-    
-        if queryparam_searchTitre:
-            queryset = queryset.filter(titre__icontains=queryparam_searchTitre)
-
-        if queryparam_tag:
-            try:
-                tag_ids = list(set(int(tag_id.strip()) for tag_id in queryparam_tag.split(',') if tag_id.strip()))
-                
-                if tag_ids: 
-                    # queryset = queryset.filter(tag__in=tag_ids)
-                    # queryset = queryset.distinct()
-                    for tag_id in tag_ids:
-                        queryset = queryset.filter(tag__id=tag_id)
-                else:
-                    pass 
-
-            except ValueError:
-                from rest_framework.exceptions import ValidationError
-                raise ValidationError({"tags": "Les IDs de tags doivent être des entiers séparés par des virgules."})
+    def perform_create(self, serializer):
+        serializer.validated_data.pop('adapteQuantity', None)
+        serializer.save(user=self.request.user)
         
-        if queryparam_OrderBy:
-            return queryset.order_by(queryparam_OrderBy)[queryparam_page]
-        else:
-            return queryset.order_by('titre')[queryparam_page]
     
-@extend_schema(tags=['Recette'])
-class RecetteCreateAPIView(generics.CreateAPIView):
-    """
-    Create Recette
-    """
-
-    queryset = recette.models.Recette.objects.all()
-    serializer_class = recette.serializer.RecetteSerializer
-
-    def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs) 
-       
-@extend_schema(tags=['Recette'])
-class RecetteDeleteAPIView(generics.DestroyAPIView):
-    queryset = recette.models.Recette.objects.all()
-    serializer_class = recette.serializer.RecetteSerializer
-
-    def delete(self, request, pk, format=None):
-        recette = self.get_object()
-        recette.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-@extend_schema(tags=['Recette'])  
-class RecetteUpdateAPIView(generics.UpdateAPIView):
-    queryset = recette.models.Recette.objects.all()
-    serializer_class = recette.serializer.RecetteSerializer
-
+    @action(detail=False, methods=['get'], url_path='single_page')
+    def single_page(self, request):
+        queryset = self.get_queryset()
+        
+        try:
+            page_index = int(request.query_params.get('page', 0))
+            instance = queryset[page_index:page_index+1].first()
+            
+            if not instance:
+                return Response({"detail": "Fin de la liste ou page vide."}, status=status.HTTP_404_NOT_FOUND)
+                
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+            
+        except (ValueError, IndexError):
+            return Response({"detail": "Index de page invalide."}, status=status.HTTP_400_BAD_REQUEST)
+    
     def _adapt_ingredient_quantities(self, recette_instance, scaling_factor):
         scaling_factor_decimal = Decimal(str(scaling_factor))
 
@@ -179,8 +98,7 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
                     new_quantity = ingredient.quantite * scaling_factor_decimal
                     ingredient.quantite = new_quantity.quantize(Decimal('0.01')) # Round to 2 decimal places
                     ingredient.save()
-
-
+    
     def update(self, request, *args, **kwargs):
         try:    
             with transaction.atomic():
@@ -188,127 +106,93 @@ class RecetteUpdateAPIView(generics.UpdateAPIView):
                 old_portion = instance.portion
 
                 data = request.data.copy()
-                adapte_quantity =data.pop("adapteQuantity", None)[0]
-                adapte_quantity =  str(adapte_quantity)=='true'
+                adapte_val = data.pop("adapteQuantity", [False])
+                if isinstance(adapte_val, list): adapte_val = adapte_val[0]
+                should_adapt = str(adapte_val).lower() == 'true'
                 
                 serializer = self.get_serializer(instance, data=data, partial=True)
                 serializer.is_valid(raise_exception=True)
-                        
                 updated_instance = serializer.save()
                 
-                if adapte_quantity and old_portion != 0:
+                if should_adapt and old_portion and old_portion != 0:
                     new_portion = updated_instance.portion
                     if new_portion != old_portion:
                         scaling_factor = new_portion / old_portion    
                         self._adapt_ingredient_quantities(updated_instance, scaling_factor)
                         
                 updated_instance.refresh_from_db()
-                
-                return Response(self.get_serializer(updated_instance).data, status=status.HTTP_200_OK)
+                return Response(self.get_serializer(updated_instance).data)
         except Exception as e:
             return Response(f"An error occurred during update recette: {e}", status=status.HTTP_400_BAD_REQUEST)
 
-
+    
 ########################
 ########################
-
 
 @extend_schema(tags=['Ingredient'])
-class IngredientRetrieveAPIView(generics.ListAPIView):
-    """
-    list of ingredientt
-    """
-
-    queryset = recette.models.Ingredient.objects.all()
-    serializer_class = recette.serializer.IngredientSerializer
-    paginator = None
-
-    # @swagger_auto_schema(operation_id='Get comments', security=[],)
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
+class IngredientViewSet(viewsets.ModelViewSet):
+    queryset = Ingredient.objects.all()
+    serializer_class = IngredientSerializer
+    pagination_class = None
+    permission_classes = [permissions.IsAuthenticated,IsOwner]
     
     def get_queryset(self):
-        queryset = super().get_queryset()
-        queryset = queryset.filter(recette__id=self.kwargs["pk"])
+        """
+        Filtre par recette_id si passé en paramètre (?recetteId=...)
+        Sinon renvoie tout (pour l'admin ou debug)
+        """
+        queryset = self.queryset
+        recette_id = self.request.query_params.get('recetteId') 
+        
+        if recette_id:
+            queryset = queryset.filter(recette_id=recette_id)
+        
         return queryset.order_by('noOrdre')
-
-@extend_schema(tags=['Ingredient'])
-class IngredientCreateAPIView(generics.CreateAPIView):
-    """
-    Create tag
-    """
-
-    queryset = recette.models.Ingredient.objects.all()
-    serializer_class = recette.serializer.IngredientSerializer
-
-    def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)  
     
-@extend_schema(tags=['Ingredient'])
-class IngredientUpdateAPIView(generics.UpdateAPIView):
-    queryset = recette.models.Ingredient.objects.all()
-    serializer_class = recette.serializer.IngredientSerializer
-
-    def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)    
-
-    def put(self, request, *args, **kwargs):
-        return super().put(request, *args, **kwargs)
+    def perform_create(self, serializer):
+        """Assigne automatiquement l'utilisateur lors de la création."""
+        recette_instance = serializer.validated_data.get('recette')
+        max_no_ordre = Ingredient.objects.filter(recette=recette_instance).aggregate(Max('noOrdre'))['noOrdre__max']
+        next_no_ordre = (max_no_ordre + 1) if max_no_ordre is not None else 0
+        serializer.save(noOrdre=next_no_ordre)
     
-    def update(self, request,  *args, **kwargs):
-        return super().update(request, *args, **kwargs)
-    
-@extend_schema(tags=['Ingredient'])
-class IngredientReorderAPIView(APIView):
-    queryset = recette.models.Ingredient.objects.all()
-    serializer_class = recette.serializer.ReorderPreparationSerializer
-
-    def get_queryset(self):
-        return recette.models.Ingredient.objects.filter(recette__id=self.kwargs["pk"]).order_by('noOrdre')
-    
-    def post(self, request, pk, pkIngredient, *args, **kwargs):
+    @action(detail=True, methods=['post'], serializer_class=ReorderIngredientSerializer)
+    def reorder(self, request, pk=None):
+        """Réorganise l'ordre d'une étape spécifique."""
         try:
-            serializer = self.serializer_class(data=request.data)
+            serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             new_position = serializer.validated_data["newPosition"]
 
             with transaction.atomic():
-                ingredient_to_move = recette.models.Ingredient.objects.get(id=self.kwargs["pkIngredient"])
-               
-                ingredients_to_reorder = recette.models.Ingredient.objects.filter(
-                    recette_id=self.kwargs["pk"]
+                ingredient_to_move = self.get_object()
+                current_recette_id = ingredient_to_move.recette_id
+
+                ingredients_to_reorder = Ingredient.objects.filter(
+                    recette_id=current_recette_id
                 ).exclude(id=ingredient_to_move.id).order_by('noOrdre')
 
-                # On construit la nouvelle liste d'ingrédients
                 new_ordered_list = []
-
                 if new_position == 0:
                     new_ordered_list.append(ingredient_to_move)
 
-                for i, ingredient in enumerate(ingredients_to_reorder):
-                    new_ordered_list.append(ingredient)
+                for i, ing in enumerate(ingredients_to_reorder):
+                    new_ordered_list.append(ing)
                     if i + 1 == new_position:
                         new_ordered_list.append(ingredient_to_move)
 
-                for index, ingredient in enumerate(new_ordered_list):
-                    ingredient.noOrdre = index
-                    ingredient.save()
+                for index, ing in enumerate(new_ordered_list):
+                    ing.noOrdre = index
+                    ing.save()
                     
-            serializer = recette.serializer.IngredientSerializer(new_ordered_list, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            result_serializer = IngredientSerializer(new_ordered_list, many=True)
+            return Response(result_serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"detail": f"Une erreur s'est produite lors de la réorganisation : {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
-
-@extend_schema(tags=['Ingredient'])
-class IngredientDeleteAPIView(generics.DestroyAPIView):
-    queryset = recette.models.Ingredient.objects.all()
-    serializer_class = recette.serializer.IngredientSerializer
-
-    def delete(self, request, pk, format=None):
-        ingredient = self.get_object()
-        ingredient.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(
+                {"detail": f"Erreur : {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 ########################
@@ -316,111 +200,78 @@ class IngredientDeleteAPIView(generics.DestroyAPIView):
 
 
 @extend_schema(tags=['Preparation'])
-class PreparationRetrieveAPIView(generics.ListAPIView):
-    """
-    list of prépration
-    """
-
-    queryset = recette.models.Preparation.objects.all()
-    serializer_class = recette.serializer.PreparationSerializer
-    paginator = None
-    
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
+class PreparationViewSet(viewsets.ModelViewSet):
+    queryset = Preparation.objects.all()
+    serializer_class = PreparationSerializer
+    pagination_class = None
+    permission_classes = [permissions.IsAuthenticated,IsOwner]
     
     def get_queryset(self):
-        queryset = super().get_queryset()
-        queryset = queryset.filter(recette_id=self.kwargs["pk"])
+        """
+        Filtre par recette_id si passé en paramètre (?recetteId=...)
+        Sinon renvoie tout (pour l'admin ou debug)
+        """
+        queryset = self.queryset
+        recette_id = self.request.query_params.get('recetteId') 
+        
+        if recette_id:
+            queryset = queryset.filter(recette_id=recette_id)
+        
         return queryset.order_by('noOrdre')
     
-@extend_schema(tags=['Preparation'])
-class PreparationCreateAPIView(generics.CreateAPIView):
-    """
-    Create tag
-    """
-
-    queryset = recette.models.Preparation.objects.all()
-    serializer_class = recette.serializer.PreparationSerializer
-
-    def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)  
-
-@extend_schema(tags=['Preparation'])
-class PreparationDeleteAPIView(generics.DestroyAPIView):
-    queryset = recette.models.Preparation.objects.all()
-    serializer_class = recette.serializer.PreparationSerializer
-
-    def delete(self, request, pk, format=None):
-        preparation = self.get_object()
-        preparation.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)   
-
-@extend_schema(tags=['Preparation'])
-class PreparationUpdateAPIView(generics.UpdateAPIView):
-    queryset = recette.models.Preparation.objects.all()
-    serializer_class = recette.serializer.PreparationSerializer
-
-    def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)    
-
-    def put(self, request, *args, **kwargs):
-        return super().put(request, *args, **kwargs)
+    def perform_create(self, serializer):
+        """Assigne automatiquement l'utilisateur lors de la création."""
+        recette_instance = serializer.validated_data.get('recette')
+        max_no_ordre = Preparation.objects.filter( recette=recette_instance).aggregate(Max('noOrdre'))['noOrdre__max']
+        next_no_ordre = (max_no_ordre + 1) if max_no_ordre is not None else 0
+        serializer.save(noOrdre=next_no_ordre)
     
-    def update(self, request,  *args, **kwargs):
-        return super().update(request, *args, **kwargs)
-
-
-    
-@extend_schema(tags=['Preparation'])
-class PreparationReorderAPIView(APIView):
-    queryset = recette.models.Preparation.objects.all()
-    serializer_class = recette.serializer.ReorderPreparationSerializer
-
-    def get_queryset(self):
-        return recette.models.Preparation.objects.filter(recette__id=self.kwargs["pk"]).order_by('noOrdre')
-    
-    def post(self, request, pk, pkPreparation, *args, **kwargs):
+    @action(detail=True, methods=['post'], serializer_class=ReorderPreparationSerializer)
+    def reorder(self, request, pk=None):
+        """Réorganise l'ordre d'une étape spécifique."""
         try:
-            serializer = self.serializer_class(data=request.data)
+            serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             new_position = serializer.validated_data["newPosition"]
 
             with transaction.atomic():
-                preparation_to_move = recette.models.Preparation.objects.get(id=self.kwargs["pkPreparation"])
-               
-                preparations_to_reorder = recette.models.Preparation.objects.filter(
-                    recette_id=self.kwargs["pk"]
+                preparation_to_move = self.get_object()
+                current_recette_id = preparation_to_move.recette_id
+
+                preparations_to_reorder = Preparation.objects.filter(
+                    recette_id=current_recette_id
                 ).exclude(id=preparation_to_move.id).order_by('noOrdre')
 
                 new_ordered_list = []
-
                 if new_position == 0:
                     new_ordered_list.append(preparation_to_move)
 
-                for i, preparation in enumerate(preparations_to_reorder):
-                    new_ordered_list.append(preparation)
+                for i, prep in enumerate(preparations_to_reorder):
+                    new_ordered_list.append(prep)
                     if i + 1 == new_position:
                         new_ordered_list.append(preparation_to_move)
 
-                for index, preparation in enumerate(new_ordered_list):
-                    preparation.noOrdre = index
-                    preparation.save()
+                for index, prep in enumerate(new_ordered_list):
+                    prep.noOrdre = index
+                    prep.save()
                     
-            serializer = recette.serializer.PreparationSerializer(new_ordered_list, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            result_serializer = PreparationSerializer(new_ordered_list, many=True)
+            return Response(result_serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"detail": f"Une erreur s'est produite lors de la réorganisation : {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
-
-
+            return Response(
+                {"detail": f"Erreur : {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
 ############
 ###########
 
 
 @extend_schema(tags=['Produit'])
 class ProduitListAPIView(generics.ListAPIView):
-    queryset = recette.models.Produit.objects.all()
-    serializer_class = recette.serializer.ProduitSerializer
+    queryset = Produit.objects.all()
+    serializer_class = ProduitSerializer
     paginator = None
 
     def get(self, request, *args, **kwargs):
@@ -442,8 +293,8 @@ class ProduitListAPIView(generics.ListAPIView):
 
 @extend_schema(tags=['Unite'])
 class UniteListAPIView(generics.ListAPIView):
-    queryset = recette.models.Unite.objects.all()
-    serializer_class = recette.serializer.UniteSerializer
+    queryset = Unite.objects.all()
+    serializer_class = UniteSerializer
     paginator = None
 
     def get(self, request, *args, **kwargs):

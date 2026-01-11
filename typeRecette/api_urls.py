@@ -1,13 +1,11 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .api_views import TypeRecetteViewSet
 
-import typeRecette.api_views
 
+router = DefaultRouter()
+router.register(r'', TypeRecetteViewSet, basename='type-recette')
 
 urlpatterns = [
-
-    path('',typeRecette.api_views.TypeRecetteListAPIView.as_view()),
-    path('create/',typeRecette.api_views.TypeRecetteCreateAPIView.as_view()),
-    path('<int:pk>/update/',typeRecette.api_views.TypeRecetteUpdateAPIView.as_view()),
-    path('<int:pk>/remove/',typeRecette.api_views.TypeRecetteDeleteAPIView.as_view()),
-    path('<int:pk>/reorder/', typeRecette.api_views.TypeRecetteReorderAPIView.as_view()),
+    path('', include(router.urls)),
 ]

@@ -1,30 +1,19 @@
-from django.urls import path
-
+from django.urls import path, include
 import recette.api_views
 
+from rest_framework.routers import DefaultRouter
+from .api_views import RecetteViewSet,  IngredientViewSet,PreparationViewSet
+
+router = DefaultRouter()
+
+router.register(r'preparation', PreparationViewSet, basename='preparation')
+router.register(r'ingredient', IngredientViewSet, basename='ingredient')
+router.register(r'', RecetteViewSet, basename='')
 
 urlpatterns = [
-
-    path('',recette.api_views.RecetteListAPIView.as_view()),
-    path('singlePage/',recette.api_views.RecetteSinglePageAPIView.as_view()),
-    path('create/', recette.api_views.RecetteCreateAPIView.as_view()),
-    path('<int:pk>/update/',recette.api_views.RecetteUpdateAPIView.as_view()),
-    path('<int:pk>/remove/',recette.api_views.RecetteDeleteAPIView.as_view()),
-    path('<int:pk>/ingredient/reorder/<int:pkIngredient>/', recette.api_views.IngredientReorderAPIView.as_view()),
-    path('<int:pk>/preparation/reorder/<int:pkPreparation>/', recette.api_views.PreparationReorderAPIView.as_view()),
-
     path('produit/',recette.api_views.ProduitListAPIView.as_view()),
     path('unite/',recette.api_views.UniteListAPIView.as_view()),
 
-    path('<int:pk>/ingredient/', recette.api_views.IngredientRetrieveAPIView.as_view()),
-    path('ingredient/create/', recette.api_views.IngredientCreateAPIView.as_view()),
-    path('ingredient/<int:pk>/update/', recette.api_views.IngredientUpdateAPIView.as_view()),
-    path('ingredient/<int:pk>/remove/',recette.api_views.IngredientDeleteAPIView.as_view()),
-
-
-    path('<int:pk>/preparation/', recette.api_views.PreparationRetrieveAPIView.as_view()),
-    path('preparation/create/', recette.api_views.PreparationCreateAPIView.as_view()),
-    path('preparation/<int:pk>/update/', recette.api_views.PreparationUpdateAPIView.as_view()),
-    path('preparation/<int:pk>/remove/',recette.api_views.PreparationDeleteAPIView.as_view()),
+   path('', include(router.urls)),
 
 ]

@@ -3,8 +3,7 @@ from rest_framework.routers import DefaultRouter
 from . import api_views
 
 router = DefaultRouter()
-# Le router gère : / , /{id}/ , /{id}/follow/ , /{id}/language/
-router.register(r'profiles', api_views.UserViewSet, basename='user-profile')
+router.register(r'profile', api_views.UserViewSet, basename='user-profile')
 
 urlpatterns = [
     path('', include(router.urls)),
