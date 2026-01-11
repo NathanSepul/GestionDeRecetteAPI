@@ -18,7 +18,8 @@ class TypeRecetteViewSet(viewsets.ModelViewSet):
         Return the list of type recette
         """
         queryset = super().get_queryset()
-        queryset = queryset.filter(user_id=self.request.user.id)
+        # queryset = queryset.filter(user_id=self.request.user.id)
+        queryset = queryset.filter(user_id=self.request.GET.get('userId'))
         return queryset.order_by('noOrdre')
     
     def perform_create(self, serializer):

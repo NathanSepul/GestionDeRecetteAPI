@@ -31,7 +31,6 @@ class RecetteViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
 
         # queryset = queryset.filter(user_id=self.request.user.id)
-        
         queryparam_UserId = self.request.GET.get('userId', '')
         queryparam_TypeRecette = self.request.GET.get('typeRecetteId', '')
         queryparam_OrderBy = self.request.GET.get('orderBy', '')
