@@ -23,7 +23,7 @@ class Recette(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name=_("Utilisateur"))
     titre = models.CharField(max_length=100)
     portion = models.IntegerField(blank=False, null=False)
-    typeRecette = models.ForeignKey(TypeRecette, models.DO_NOTHING, verbose_name=_("Type de recette"))
+    typeRecette = models.ForeignKey(TypeRecette, on_delete=models.PROTECT, verbose_name=_("Type de recette"))
     imageOld = models.BinaryField(blank=True, null=True)
     image = models.ImageField(upload_to=path_and_rename, blank=True, null=True,)
     conseil = models.TextField(blank=True, null=True)
@@ -44,10 +44,6 @@ class Recette(models.Model):
     
     image_preview.short_description = 'Aperçu'
 
-    def get_imageField_url(self):
-        if self.image and self.image.file:
-            return self.image.url
-        return staticfiles_storage.url('photos/{0}.png',self.titre)
 
 @receiver(post_delete, sender=Recette)
 def auto_delete_file_on_delete(sender, instance, **kwargs):
@@ -76,7 +72,7 @@ def auto_delete_file_on_change(sender, instance, **kwargs):
 class Produit(models.Model):
     nom = models.TextField(unique=True)
     nomPluriel =  models.TextField()
-    produitDeBase = models.ForeignKey('self', on_delete=models.DO_NOTHING, verbose_name=_("Produit de base"),blank=True,null=True)
+    produitDeBase = models.ForeignKey('self', on_delete=models.PROTECT, verbose_name=_("Produit de base"),blank=True,null=True)
     determinant =  models.TextField(max_length=5,blank=True,null=True)
 
     class Meta:
@@ -91,7 +87,7 @@ class Unite(models.Model):
     code = models.TextField(max_length=5)
     description = models.TextField()
     borneSuperieur = models.IntegerField(blank=True,null=True)
-    uniteSuperieur = models.ForeignKey('self', on_delete=models.DO_NOTHING, verbose_name=_("Unité superieur"),blank=True,null=True)
+    uniteSuperieur = models.ForeignKey('self', on_delete=models.PROTECT, verbose_name=_("Unité superieur"),blank=True,null=True)
 
     class Meta:
         db_table = 'unite'
@@ -109,8 +105,8 @@ class Ingredient(models.Model):
     isSection = models.BooleanField(default=False) 
     quantite = models.DecimalField(max_digits=9, decimal_places=2, blank=True, null=True)
     nom = models.TextField(blank=True,null=True)
-    unite  = models.ForeignKey(Unite, models.DO_NOTHING, blank=True, null=True)
-    produit = models.ForeignKey(Produit, models.DO_NOTHING, blank=True, null=True)
+    unite  = models.ForeignKey(Unite, on_delete=models.PROTECT, blank=True, null=True)
+    produit = models.ForeignKey(Produit, on_delete=models.PROTECT, blank=True, null=True)
 
     class Meta:
         db_table = 'ingredient'

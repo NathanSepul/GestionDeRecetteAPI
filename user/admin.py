@@ -10,7 +10,7 @@ class UserAdmin(BaseUserAdmin):
 
     list_display = ('email', 'first_name', 'last_name', 'is_superuser', 'is_active')
     list_filter = ('is_active','is_superuser')
-    readonly_fields = ('last_login', "date_joined")
+    readonly_fields = ('last_login', "date_joined","avatar_preview")
     list_per_page = 20
     search_fields = ('email', )
     ordering = ('email', )
@@ -18,7 +18,7 @@ class UserAdmin(BaseUserAdmin):
     fieldsets = (
         ("Identification", {'fields': ('email', 'password')}),
 
-        ('Informations personnelles', {'fields': ( 'first_name', 'last_name','language' )}),
+        ('Informations personnelles', {'fields': ( 'first_name', 'last_name','language', "avatar", "avatar_preview")}),
 
         ('Date importante', {'fields': ('last_login', 'date_joined')}),
 

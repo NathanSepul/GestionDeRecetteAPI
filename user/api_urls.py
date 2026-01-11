@@ -1,21 +1,19 @@
 from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from . import api_views
 
-import user.api_views
+router = DefaultRouter()
+# Le router gère : / , /{id}/ , /{id}/follow/ , /{id}/language/
+router.register(r'profiles', api_views.UserViewSet, basename='user-profile')
 
 urlpatterns = [
+    path('', include(router.urls)),
 
-    path('<int:pk>/', user.api_views.UserViewSet.as_view()),
-    path('<int:pk>/update/', user.api_views.UserViewSetUpdate.as_view()),
-
-    path('<int:pk>/language/', user.api_views.LanguageViewSet.as_view()),
-    path('<int:pk>/language/update', user.api_views.UpdateLanguageView.as_view()),
+    path('registration/register/', api_views.RegisterView.as_view()),
+    path('registration/verify-email/', api_views.VerifyEmailView),
+    path('registration/verify-registration/', api_views.VerifyRegistrationView.as_view()),
+    path('registration/send-reset-password-link/', api_views.SendResetPasswordLinkView.as_view()),
+    path('registration/reset-password/', api_views.ResetPasswordView.as_view()),
     
-    path('registration/register/', user.api_views.RegisterView.as_view(),),
-    path('registration/verify-email/', user.api_views.VerifyEmailView,),
-    path('registration/verify-registration/', user.api_views.VerifyRegistrationView.as_view(),),
-    path('registration/send-reset-password-link/',user.api_views.SendResetPasswordLinkView.as_view()),
-    path('registration/reset-password/', user.api_views.ResetPasswordView.as_view(),),
-    path('unregister/', user.api_views.UserViewUnregister.as_view(),),
-
     path('', include("django.contrib.auth.urls")),
 ]

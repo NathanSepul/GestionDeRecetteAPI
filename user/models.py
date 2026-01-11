@@ -1,12 +1,21 @@
+import os
+import uuid
 from django.db import models
 from django.contrib.auth.models import BaseUserManager, AbstractUser
+from django.contrib.staticfiles.storage import staticfiles_storage
+from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
-
+from django.utils.html import format_html
+from django.db.models.signals import post_delete, pre_save
 
 # Custom Auth
 # https://docs.djangoproject.com/fr/3.2/topics/auth/customizing/#a-full-example
 
-
+def path_and_rename(instance, filename):
+        ext = filename.split('.')[-1]
+        unique_id = uuid.uuid4().hex[:8]
+        return os.path.join('avatars/', f"{unique_id}.{ext}")
+    
 class UserManager(BaseUserManager):
     """Define a model manager for User model with no username field."""
 
@@ -63,7 +72,8 @@ class User(AbstractUser):
     first_name = models.CharField(verbose_name=_("Prénom"), max_length=255,)
     last_name = models.CharField(verbose_name=_("Nom"), max_length=255,)
     language = models.CharField( max_length=8, choices=LANGUAGES, default="fr" )
-
+    following = models.ManyToManyField('self', blank=True, symmetrical=False,related_name='followers')
+    avatar = models.ImageField(upload_to=path_and_rename, blank=True, null=True,)
 
     # pour ne pas avoir de username (contrer les valeurs par defaut)
     username = None
@@ -80,3 +90,33 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+    def avatar_preview(self):
+        if self.avatar:
+            return format_html('<img src="{}" style="width: 100px; height: auto; border-radius: 5px;" />', self.avatar.url)
+        return "Pas d'image"
+    
+    avatar_preview.short_description = 'Aperçu'
+
+@receiver(post_delete, sender=User)
+def auto_delete_file_on_delete(sender, instance, **kwargs):
+    """Supprime le fichier du disque quand la recette est supprimée de la base."""
+    if instance.avatar:
+        if os.path.isfile(instance.avatar.path):
+            os.remove(instance.avatar.path)
+
+@receiver(pre_save, sender=User)
+def auto_delete_file_on_change(sender, instance, **kwargs):
+    """Supprime l'ancien fichier quand une nouvelle image est téléchargée."""
+    if not instance.pk:
+        return False
+
+    try:
+        old_file = User.objects.get(pk=instance.pk).avatar
+    except User.DoesNotExist:
+        return False
+
+    new_file = instance.avatar
+    if old_file and old_file != new_file:
+        if os.path.isfile(old_file.path):
+            os.remove(old_file.path)

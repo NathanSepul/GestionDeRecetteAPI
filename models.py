@@ -10,7 +10,7 @@ from django.db import models
 
 class Ingredient(models.Model):
     id = models.IntegerField(primary_key=True)
-    idrecette = models.ForeignKey('Recette', models.DO_NOTHING, db_column='idRecette')  # Field name made lowercase.
+    idrecette = models.ForeignKey('Recette', on_delete=models.CASCADE, db_column='idRecette')  # Field name made lowercase.
     noordre = models.IntegerField(db_column='noOrdre')  # Field name made lowercase.
     issection = models.IntegerField(db_column='isSection')  # Field name made lowercase.
     quantite = models.DecimalField(max_digits=9, decimal_places=2, blank=True, null=True)
@@ -23,7 +23,7 @@ class Ingredient(models.Model):
 
 class Preparation(models.Model):
     id = models.IntegerField(primary_key=True)
-    idrecette = models.ForeignKey('Recette', models.DO_NOTHING, db_column='idRecette')  # Field name made lowercase.
+    idrecette = models.ForeignKey('Recette', on_delete=models.CASCADE, db_column='idRecette')  # Field name made lowercase.
     section = models.CharField(max_length=100, blank=True, null=True)
     noordre = models.IntegerField(db_column='noOrdre')  # Field name made lowercase.
     description = models.TextField()
@@ -38,7 +38,7 @@ class Recette(models.Model):
     id = models.IntegerField(primary_key=True)
     titre = models.CharField(max_length=100)
     portion = models.IntegerField(blank=True, null=True)
-    idtyperecette = models.ForeignKey('Typerecette', models.DO_NOTHING, db_column='idTypeRecette')  # Field name made lowercase.
+    idtyperecette = models.ForeignKey('Typerecette', on_delete=models.PROTECT, db_column='idTypeRecette')  # Field name made lowercase.
     image = models.TextField(blank=True, null=True)
     conseil = models.TextField(blank=True, null=True)
 
@@ -63,8 +63,8 @@ class Tag(models.Model):
 
 class Tagrecette(models.Model):
     id = models.IntegerField(primary_key=True)
-    idtag = models.ForeignKey(Tag, models.DO_NOTHING, db_column='idTag')  # Field name made lowercase.
-    idrecette = models.ForeignKey(Recette, models.DO_NOTHING, db_column='idRecette')  # Field name made lowercase.
+    idtag = models.ForeignKey(Tag, on_delete=models.CASCADE, db_column='idTag')  # Field name made lowercase.
+    idrecette = models.ForeignKey(Recette, on_delete=models.CASCADE, db_column='idRecette')  # Field name made lowercase.
 
     class Meta:
         managed = False

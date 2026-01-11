@@ -8,18 +8,28 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 
 class UserBaseSerializer(serializers.ModelSerializer):
-     class Meta:
+    avatar = serializers.ImageField( required=False, max_length=None, use_url=True)
+    
+    class Meta:
         model = user.models.User
-        fields = ['id' ]
+        fields = ['id', 'email', 'first_name', 'last_name', 'avatar']
 
 class UserSerializer(serializers.ModelSerializer):
     date_joined = serializers.DateTimeField(read_only=True)
     email = serializers.ReadOnlyField()
+    isFollowed = serializers.SerializerMethodField()
+    avatar = serializers.ImageField( required=False, max_length=None, use_url=True)
 
     class Meta:
         model = user.models.User
-        fields = ['id', 'email', 'first_name', 'last_name', 'date_joined', 'language']
+        fields = ['id', 'email', 'first_name', 'last_name', 'date_joined', 'language', 'isFollowed', 'avatar']
     
+    def get_isFollowed(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            # Vérifie si l'utilisateur connecté suit ce profil
+            return request.user.following.filter(id=obj.id).exists()
+
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
 

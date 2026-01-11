@@ -26,9 +26,6 @@ class RecetteSerializer(serializers.ModelSerializer):
         instance = recette.models.Recette.objects.create(user=self.context['request'].user, **validated_data)
         return instance
 
-    def get_imagefield_url(self, obj):
-        return obj.get_imagefield_url()
-
 
 # 
 # ----------------------------------
