@@ -50,14 +50,24 @@ Ajoutez un fichier ``.env`` à la racine du dossier de l'API en incluant les inf
 
 .. code-block:: txt
 
-    DEBUG=True
+    DEBUG=on
+    SECRET_KEY=''
 
     # DB
-    DB_USER= 
-    DB_PASSWORD= 
+    DB_USER=
+    DB_PASSWORD=
     DB_DATABASE=recette
-    DB_HOST= 
+    DB_HOST=localhost
     DB_PORT=
+
+    DEBUG_EMAIL=''
+    DEFAULT_FROM_EMAIL='''
+    EMAIL_HOST_USER=''
+    EMAIL_HOST_PASSWORD=''
+    EMAIL_HOST=''
+    EMAIL_PORT=
+
+    APP_NAME='MesRecettes'
 
 |
 
