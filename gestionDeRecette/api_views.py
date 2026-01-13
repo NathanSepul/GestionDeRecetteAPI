@@ -1,3 +1,4 @@
+import mimetypes
 from django.http import HttpResponse, HttpResponseForbidden
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from drf_spectacular.utils import extend_schema
