@@ -46,5 +46,8 @@ def serve_image(request, path):
 
     response = HttpResponse()
     response['X-Accel-Redirect'] = f'/internal-media/{path}'
-    response['Content-type'] = ""
+    content_type, encoding = mimetypes.guess_type(path)
+    if content_type:
+        response['Content-Type'] = content_type
+        
     return response
