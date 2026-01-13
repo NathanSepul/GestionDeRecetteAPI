@@ -1,8 +1,10 @@
 import mimetypes
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from drf_spectacular.utils import extend_schema
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -40,15 +42,12 @@ class MyTokenVerifyView(TokenVerifyView):
         return super().post(request, *args, **kwargs)
 
 @api_view(['GET'])
+@authentication_classes([SessionAuthentication, TokenAuthentication, JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def serve_image(request, path):
-    if not request.user.is_authenticated:
-        return HttpResponseForbidden()
-
     response = HttpResponse()
     response['X-Accel-Redirect'] = f'/internal-media/{path}'
     content_type, encoding = mimetypes.guess_type(path)
-    if content_type:
-        response['Content-Type'] = content_type
-        
+    response['Content-Type'] = content_type or 'image/png' 
+
     return response
