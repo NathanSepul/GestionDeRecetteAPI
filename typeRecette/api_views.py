@@ -1,9 +1,10 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status,permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 from django.db import transaction
 from django.db.models import Max
+from gestionDeRecette.api_views import IsOwner
 from typeRecette.models import TypeRecette
 from typeRecette.serializer import TypeRecetteSerializer, ReorderTypeRecetteSerializer
 
@@ -12,14 +13,19 @@ class TypeRecetteViewSet(viewsets.ModelViewSet):
     queryset = TypeRecette.objects.all()
     serializer_class = TypeRecetteSerializer
     pagination_class = None
+    permission_classes = [permissions.IsAuthenticated, IsOwner]
     
     def get_queryset(self):
         """
         Return the list of type recette
         """
         queryset = super().get_queryset()
+        
         # queryset = queryset.filter(user_id=self.request.user.id)
-        queryset = queryset.filter(user_id=self.request.GET.get('userId'))
+        userID = self.request.GET.get('userId')
+        if userID:
+            queryset = queryset.filter(user_id=userID)
+        
         return queryset.order_by('noOrdre')
     
     def perform_create(self, serializer):

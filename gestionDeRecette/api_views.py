@@ -5,12 +5,30 @@ from rest_framework.authentication import SessionAuthentication, TokenAuthentica
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework import permissions
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
     TokenVerifyView,
 )
 
+class IsOwner(permissions.BasePermission):
+    """
+    Permission permettant de ne laisser que le propriétaire modifier l'objet.
+    """
+    def has_object_permission(self, request, view, obj):
+        
+        print(request.user)
+        if hasattr(obj, 'user'):
+            print(f'direct {obj.user}')
+            return obj.user == request.user
+        
+        if hasattr(obj, 'recette'):
+            print('indirect {obj.user}' )
+            return obj.recette.user == request.user
+            
+        return False
+    
 @extend_schema(tags=['Utilisateur'])
 class MyLogin(TokenObtainPairView):
 

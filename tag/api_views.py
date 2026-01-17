@@ -3,7 +3,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 from django.shortcuts import get_object_or_404
+from rest_framework import permissions
 
+from gestionDeRecette.api_views import IsOwner
 from recette.models import Recette
 from tag.models import Tag
 from tag.serializer import TagSerializer, TagRecetteLinkSerializer
@@ -13,12 +15,19 @@ class TagViewSet(viewsets.ModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     pagination_class = None
+    permission_classes = [permissions.IsAuthenticated, IsOwner]
     
     def get_queryset(self):
         """Filtre les tags par utilisateur et optionnellement par recetteId."""
-        queryset = self.queryset.filter(user_id=self.request.user.id)
+        queryset = super().get_queryset()
+        
+        # queryset = self.queryset.filter(user_id=self.request.user.id)
+        userID = self.request.GET.get('userId')
+        
+        if userID:
+            queryset = queryset.filter(user_id=userID)
+       
         recette_id = self.request.query_params.get('recetteId')
-
         if recette_id:
             queryset = queryset.filter(recettes__id=recette_id)
             

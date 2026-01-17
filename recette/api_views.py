@@ -4,22 +4,11 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, status, generics, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from gestionDeRecette.api_views import IsOwner
 from recette.models import *
 from recette.serializer import  *
 from django.db.models import Max
 
-class IsOwner(permissions.BasePermission):
-    """
-    Permission permettant de ne laisser que le propriétaire modifier l'objet.
-    """
-    def has_object_permission(self, request, view, obj):
-        if hasattr(obj, 'user'):
-            return obj.user == request.user
-        
-        if hasattr(obj, 'recette'):
-            return obj.recette.user == request.user
-            
-        return False
     
 @extend_schema(tags=['Recette'])
 class RecetteViewSet(viewsets.ModelViewSet):
