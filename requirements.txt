@@ -1,4 +1,4 @@
-django==4.2.23
+django==6.0.2
 djangorestframework
 djangorestframework-simplejwt
 django-cors-headers
@@ -9,3 +9,4 @@ drf-spectacular
 django-rest-registration
 gunicorn
 django_extensions
+mysqlclient==2.2.7
