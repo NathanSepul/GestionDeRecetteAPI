@@ -1,3 +1,4 @@
+from django.http import QueryDict
 from django.shortcuts import render
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
@@ -87,6 +88,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
 @extend_schema(tags=['Utilisateur'])
 def VerifyEmailView(request):
+    print(request)
     return render(request, 'registration/verify_email.html')
 
 @extend_schema(tags=['Utilisateur'])
@@ -108,8 +110,20 @@ class VerifyRegistrationView(generics.GenericAPIView):
 class RegisterView(generics.GenericAPIView):
     serializer_class = registration_settings.REGISTER_SERIALIZER_CLASS
     permission_classes = [permissions.AllowAny]
+
     def post(self, request, *args, **kwargs):
-       return rest_register(request._request)
+        data = request.data.copy() if hasattr(request.data, 'copy') else request.data
+        print(data)
+        if 'following' in data:
+            del data['following']
+            
+        if isinstance(request._request.POST, QueryDict):
+            request._request.POST = QueryDict('', mutable=True)
+            request._request.POST.update(data)
+        else:
+            request._request.POST = data
+
+        return rest_register(request._request)
 
 @extend_schema(tags=['Utilisateur'])
 class SendResetPasswordLinkView(generics.GenericAPIView):

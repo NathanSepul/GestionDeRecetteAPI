@@ -18,13 +18,10 @@ class IsOwner(permissions.BasePermission):
     """
     def has_object_permission(self, request, view, obj):
         
-        print(request.user)
         if hasattr(obj, 'user'):
-            print(f'direct {obj.user}')
             return obj.user == request.user
         
         if hasattr(obj, 'recette'):
-            print('indirect {obj.user}' )
             return obj.recette.user == request.user
             
         return False
