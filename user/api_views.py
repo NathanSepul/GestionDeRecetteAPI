@@ -88,7 +88,6 @@ class UserViewSet(viewsets.ModelViewSet):
 
 @extend_schema(tags=['Utilisateur'])
 def VerifyEmailView(request):
-    print(request)
     return render(request, 'registration/verify_email.html')
 
 @extend_schema(tags=['Utilisateur'])
@@ -112,18 +111,7 @@ class RegisterView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
-        data = request.data.copy() if hasattr(request.data, 'copy') else request.data
-        print(data)
-        if 'following' in data:
-            del data['following']
-            
-        if isinstance(request._request.POST, QueryDict):
-            request._request.POST = QueryDict('', mutable=True)
-            request._request.POST.update(data)
-        else:
-            request._request.POST = data
-
-        return rest_register(request._request)
+       return rest_register(request._request)
 
 @extend_schema(tags=['Utilisateur'])
 class SendResetPasswordLinkView(generics.GenericAPIView):
