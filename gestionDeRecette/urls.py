@@ -15,12 +15,14 @@ api_urlpattern = [
     path("api/login/", MyLogin.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", MyTokenRefreshView.as_view(), name="token_refresh"),
     path("api/token/verify/", MyTokenVerifyView.as_view(), name="token_verify"),
+    
+    path('api/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    
 ]
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 ]
 
 urlpatterns += api_urlpattern
