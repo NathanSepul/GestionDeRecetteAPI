@@ -2,7 +2,9 @@ from django.urls import path, include
 import recette.api_views
 
 from rest_framework.routers import DefaultRouter
-from .api_views import RecetteViewSet,  IngredientViewSet,PreparationViewSet
+
+from recette.views import generer_pdf
+from .api_views import RecetteViewSet, IngredientViewSet, PreparationViewSet
 
 router = DefaultRouter()
 
@@ -11,9 +13,8 @@ router.register(r'ingredient', IngredientViewSet, basename='ingredient')
 router.register(r'', RecetteViewSet, basename='')
 
 urlpatterns = [
-    path('produit/',recette.api_views.ProduitListAPIView.as_view()),
-    path('unite/',recette.api_views.UniteListAPIView.as_view()),
-
-   path('', include(router.urls)),
-
+    path('produit/', recette.api_views.ProduitListAPIView.as_view()),
+    path('unite/', recette.api_views.UniteListAPIView.as_view()),
+    path("<int:recette_id>/pdf/", generer_pdf, name="recette_pdf"),
+    path('', include(router.urls)),
 ]

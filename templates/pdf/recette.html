@@ -1,0 +1,245 @@
+<!doctype html>
+{% load static %}
+<html lang="fr">
+	<head>
+		<meta charset="UTF-8" />
+		<title>{{ recette.titre }}</title>
+		<style>
+			@page {
+				size: A4;
+				margin: 2cm 1.8cm;
+				@bottom-center {
+					content: "Recette générée le {{ recette.titre }}";
+					font-size: 9px;
+					color: #999;
+				}
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+
+			body {
+				font-family: "Helvetica Neue", Arial, sans-serif;
+				color: #2c2c2c;
+				line-height: 1.5;
+				font-size: 12px;
+			}
+
+			/* En-tête */
+			.header {
+				display: flex;
+				border-bottom: 3px solid #d97742;
+				padding-bottom: 16px;
+				margin-bottom: 24px;
+			}
+
+			.header-image {
+				width: 130px;
+				height: 130px;
+				border-radius: 8px;
+				object-fit: cover;
+				margin-right: 20px;
+			}
+
+			.header-content {
+				flex: 1;
+			}
+
+			.header-content h1 {
+				font-size: 26px;
+				margin: 0 0 8px 0;
+				color: #1a1a1a;
+			}
+
+			.meta-badges {
+				display: flex;
+				gap: 10px;
+				margin-top: 10px;
+			}
+
+			.badge {
+				background-color: #fdf0e6;
+				color: #d97742;
+				padding: 4px 12px;
+				border-radius: 20px;
+				font-size: 11px;
+				font-weight: 600;
+			}
+
+			/* Sections principales */
+			.section-title {
+				font-size: 15px;
+				font-weight: 700;
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+				color: #d97742;
+				border-bottom: 1px solid #e5e5e5;
+				padding-bottom: 6px;
+				margin-bottom: 14px;
+				margin-top: 28px;
+			}
+
+			/* Ingrédients */
+			.ingredients-list {
+				list-style: none;
+				padding: 0;
+				margin: 0;
+			}
+
+			.ingredients-list li {
+				padding: 6px 0;
+				border-bottom: 1px dotted #e5e5e5;
+				display: flex;
+				justify-content: space-between;
+			}
+
+			.ingredient-quantite {
+				font-weight: 600;
+				color: #d97742;
+				min-width: 90px;
+			}
+
+			.ingredient-nom {
+				flex: 1;
+				padding-left: 10px;
+			}
+
+			.ingredient-section-title {
+				font-weight: 700;
+				font-size: 13px;
+				margin-top: 16px;
+				margin-bottom: 6px;
+				color: #1a1a1a;
+				border: none;
+				padding: 0;
+			}
+
+			.ingredient-section-title:first-child {
+				margin-top: 0;
+			}
+
+			/* Préparation */
+			.preparation-step {
+				display: flex;
+				margin-bottom: 14px;
+				page-break-inside: avoid;
+			}
+
+			.step-number {
+				background-color: #d97742;
+				color: white;
+				width: 26px;
+				height: 26px;
+				border-radius: 50%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: 700;
+				font-size: 12px;
+				flex-shrink: 0;
+				margin-right: 14px;
+			}
+
+			.step-description {
+				flex: 1;
+				padding-top: 3px;
+			}
+
+			.preparation-section-title {
+				font-weight: 700;
+				font-size: 13px;
+				margin-top: 18px;
+				margin-bottom: 10px;
+				color: #1a1a1a;
+			}
+
+			.preparation-section-title:first-child {
+				margin-top: 0;
+			}
+
+			/* Conseil */
+			.conseil-box {
+				background-color: #fdf7ed;
+				border-left: 4px solid #d97742;
+				padding: 14px 18px;
+				margin-top: 24px;
+				border-radius: 0 6px 6px 0;
+				font-style: italic;
+				page-break-inside: avoid;
+			}
+
+			.conseil-box strong {
+				font-style: normal;
+				display: block;
+				margin-bottom: 4px;
+				color: #d97742;
+			}
+
+			/* Grille 2 colonnes pour ingrédients + préparation côte à côte */
+			.content-grid {
+				display: flex;
+				gap: 30px;
+			}
+
+			.col-ingredients {
+				width: 35%;
+			}
+
+			.col-preparation {
+				width: 65%;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="header">
+			{% if recette.image %}
+			<img class="header-image" src="{{ recette.image.url }}" alt="{{ recette.titre }}" />
+			{% endif %}
+			<div class="header-content">
+				<h1>{{ recette.titre }}</h1>
+				<div class="meta-badges">
+					<span class="badge">{{ recette.typeRecette }}</span>
+					<span class="badge">{{ recette.portion }} portion{{ recette.portion|pluralize }}</span>
+				</div>
+			</div>
+		</div>
+
+		<div class="content-grid">
+			<div class="col-ingredients">
+				<div class="section-title">Ingrédients</div>
+				<ul class="ingredients-list">
+					{% for ingredient in ingredients %} {% if ingredient.isSection %}
+					<div class="ingredient-section-title">{{ ingredient.nom }}</div>
+					{% else %}
+					<li>
+						<span class="ingredient-quantite">
+							{% if ingredient.quantite %}{{ ingredient.quantite }}{% endif %} {% if ingredient.unite %}{{ ingredient.unite.code }}{% endif %}
+						</span>
+						<span class="ingredient-nom">{{ ingredient.nom }}</span>
+					</li>
+					{% endif %} {% endfor %}
+				</ul>
+			</div>
+
+			<div class="col-preparation">
+				<div class="section-title">Préparation</div>
+				{% for preparation in preparations %} {% if preparation.isSection %}
+				<div class="preparation-section-title">{{ preparation.description }}</div>
+				{% else %}
+				<div class="preparation-step">
+					<div class="step-number">{{ forloop.counter }}</div>
+					<div class="step-description">{{ preparation.description }}</div>
+				</div>
+				{% endif %} {% endfor %}
+			</div>
+		</div>
+
+		{% if recette.conseil %}
+		<div class="conseil-box">
+			<strong>Conseil du chef</strong>
+			{{ recette.conseil }}
+		</div>
+		{% endif %}
+	</body>
+</html>

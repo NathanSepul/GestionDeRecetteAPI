@@ -10,3 +10,4 @@ django-rest-registration
 gunicorn
 django_extensions
 mysqlclient==2.2.7
+weasyprint
