@@ -20,6 +20,5 @@ def generer_pdf(request, recette_id):
 
     response = HttpResponse(pdf, content_type="application/pdf")
     filename = f"{recette.titre}.pdf"
-    response["Content-Disposition"] = f'inline; filename="{filename}"'
-    # Utilise 'attachment' au lieu de 'inline' pour forcer le téléchargement direct
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
