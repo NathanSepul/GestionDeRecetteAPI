@@ -9,7 +9,7 @@
 				size: A4;
 				margin: 2cm 1.8cm;
 				@bottom-center {
-					content: "Recette générée le {{ recette.titre }}";
+					content: "{{ recette.titre }}";
 					font-size: 9px;
 					color: #999;
 				}
@@ -95,11 +95,6 @@
 
 			/* ============================================
 			   INGRÉDIENTS
-			   -> Plus de flex côte-à-côte avec la préparation :
-			      on empile les sections dans le flux normal.
-			   -> column-count répartit la liste en 2 colonnes
-			      SI elle est longue, tout en se paginant
-			      correctement (contrairement à flex).
 			   ============================================ */
 			.ingredients-list {
 				list-style: none;
@@ -115,21 +110,21 @@
 				table-layout: fixed;
 				padding: 6px 0;
 				border-bottom: 1px dotted #e5e5e5;
-				break-inside: avoid; /* n'éclate pas un ingrédient entre 2 colonnes/pages */
+				break-inside: avoid;
 			}
 
 			.ingredient-quantite {
 				display: table-cell;
 				font-weight: 600;
 				color: #d97742;
-				width: 90px;
+				width: 55px;
 				white-space: nowrap;
 				vertical-align: top;
 			}
 
 			.ingredient-nom {
 				display: table-cell;
-				padding-left: 10px;
+				padding-left: 5px;
 				vertical-align: top;
 				text-align: left;
 			}
@@ -143,7 +138,7 @@
 				border: none;
 				padding: 0;
 				break-inside: avoid;
-				break-after: avoid; /* le titre reste collé au premier ingrédient qui suit */
+				break-after: avoid;
 				column-span: none;
 			}
 
@@ -238,7 +233,7 @@
 			{% else %}
 			<li>
 				<span class="ingredient-quantite">
-					{% if ingredient.quantite %}{{ ingredient.quantite }}{% endif %} {% if ingredient.unite %}{{ ingredient.unite.code|default:"" }}{% endif %}
+					{% if ingredient.quantite %}{{ ingredient.quantite|floatformat:"-2" }}{% endif %} {% if ingredient.unite %} {{ ingredient.unite.code|default:"" }}{% endif %}
 				</span>
 				<span class="ingredient-nom">{{ ingredient.produit.nom|default:"" }}</span>
 			</li>
