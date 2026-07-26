@@ -8,7 +8,7 @@ from .models import Recette, Ingredient, Preparation
 
 def generer_pdf(request, recette_id):
     recette = get_object_or_404(Recette, pk=recette_id)
-    ingredients = Ingredient.objects.filter(recette=recette).order_by('noOrdre')
+    ingredients = Ingredient.objects.filter(recette=recette).select_related('produit', 'unite').order_by('noOrdre')
     preparations = Preparation.objects.filter(recette=recette).order_by('noOrdre')
 
     tags_recette = Tag.objects.filter(recettes=recette)

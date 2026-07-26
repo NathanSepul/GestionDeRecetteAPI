@@ -240,7 +240,7 @@
 				<span class="ingredient-quantite">
 					{% if ingredient.quantite %}{{ ingredient.quantite }}{% endif %} {% if ingredient.unite %}{{ ingredient.unite.code|default:"" }}{% endif %}
 				</span>
-				<span class="ingredient-nom">{{ ingredient.nom|default:"" }}</span>
+				<span class="ingredient-nom">{{ ingredient.produit.nom|default:"" }}</span>
 			</li>
 			{% endif %} {% endfor %}
 		</ul>
