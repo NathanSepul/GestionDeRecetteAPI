@@ -54,7 +54,8 @@
 
 			.meta-badges {
 				display: flex;
-				gap: 10px;
+				flex-wrap: wrap;
+				gap: 8px;
 				margin-top: 10px;
 			}
 
@@ -67,7 +68,19 @@
 				font-weight: 600;
 			}
 
-			/* Sections principales */
+			.tag-badge {
+				display: inline-block;
+				padding: 4px 14px;
+				border-radius: 999px;
+				font-size: 10px;
+				font-weight: 600;
+				line-height: 1.3;
+				white-space: nowrap;
+				/* la couleur de fond/texte est fixée en inline via le style
+				   calculé côté vue (voir tag.style) */
+			}
+
+			/* Titres de section */
 			.section-title {
 				font-size: 15px;
 				font-weight: 700;
@@ -80,29 +93,45 @@
 				margin-top: 28px;
 			}
 
-			/* Ingrédients */
+			/* ============================================
+			   INGRÉDIENTS
+			   -> Plus de flex côte-à-côte avec la préparation :
+			      on empile les sections dans le flux normal.
+			   -> column-count répartit la liste en 2 colonnes
+			      SI elle est longue, tout en se paginant
+			      correctement (contrairement à flex).
+			   ============================================ */
 			.ingredients-list {
 				list-style: none;
 				padding: 0;
 				margin: 0;
+				column-count: 2;
+				column-gap: 30px;
 			}
 
 			.ingredients-list li {
+				display: table;
+				width: 100%;
+				table-layout: fixed;
 				padding: 6px 0;
 				border-bottom: 1px dotted #e5e5e5;
-				display: flex;
-				justify-content: space-between;
+				break-inside: avoid; /* n'éclate pas un ingrédient entre 2 colonnes/pages */
 			}
 
 			.ingredient-quantite {
+				display: table-cell;
 				font-weight: 600;
 				color: #d97742;
-				min-width: 90px;
+				width: 90px;
+				white-space: nowrap;
+				vertical-align: top;
 			}
 
 			.ingredient-nom {
-				flex: 1;
+				display: table-cell;
 				padding-left: 10px;
+				vertical-align: top;
+				text-align: left;
 			}
 
 			.ingredient-section-title {
@@ -113,17 +142,22 @@
 				color: #1a1a1a;
 				border: none;
 				padding: 0;
+				break-inside: avoid;
+				break-after: avoid; /* le titre reste collé au premier ingrédient qui suit */
+				column-span: none;
 			}
 
 			.ingredient-section-title:first-child {
 				margin-top: 0;
 			}
 
-			/* Préparation */
+			/* ============================================
+			   PRÉPARATION
+			   ============================================ */
 			.preparation-step {
 				display: flex;
 				margin-bottom: 14px;
-				page-break-inside: avoid;
+				break-inside: avoid; /* break-inside est la propriété standard, plus fiable que page-break-inside avec WeasyPrint */
 			}
 
 			.step-number {
@@ -152,6 +186,7 @@
 				margin-top: 18px;
 				margin-bottom: 10px;
 				color: #1a1a1a;
+				break-after: avoid;
 			}
 
 			.preparation-section-title:first-child {
@@ -166,7 +201,7 @@
 				margin-top: 24px;
 				border-radius: 0 6px 6px 0;
 				font-style: italic;
-				page-break-inside: avoid;
+				break-inside: avoid;
 			}
 
 			.conseil-box strong {
@@ -174,20 +209,6 @@
 				display: block;
 				margin-bottom: 4px;
 				color: #d97742;
-			}
-
-			/* Grille 2 colonnes pour ingrédients + préparation côte à côte */
-			.content-grid {
-				display: flex;
-				gap: 30px;
-			}
-
-			.col-ingredients {
-				width: 35%;
-			}
-
-			.col-preparation {
-				width: 65%;
 			}
 		</style>
 	</head>
@@ -202,40 +223,37 @@
 					<span class="badge">{{ recette.typeRecette }}</span>
 					<span class="badge">{{ recette.portion }} portion{{ recette.portion|pluralize }}</span>
 				</div>
-			</div>
-		</div>
-
-		<div class="content-grid">
-			<div class="col-ingredients">
-				<div class="section-title">Ingrédients</div>
-				<ul class="ingredients-list">
-					{% for ingredient in ingredients %} {% if ingredient.isSection %}
-					<div class="ingredient-section-title">{{ ingredient.nom }}</div>
-					{% else %}
-					<li>
-						<span class="ingredient-quantite">
-							{% if ingredient.quantite %}{{ ingredient.quantite }}{% endif %} {% if ingredient.unite %}{{ ingredient.unite.code }}{% endif %}
-						</span>
-						<span class="ingredient-nom">{{ ingredient.nom }}</span>
-					</li>
-					{% endif %} {% endfor %}
-				</ul>
-			</div>
-
-			<div class="col-preparation">
-				<div class="section-title">Préparation</div>
-				{% for preparation in preparations %} {% if preparation.isSection %}
-				<div class="preparation-section-title">{{ preparation.description }}</div>
-				{% else %}
-				<div class="preparation-step">
-					<div class="step-number">{{ forloop.counter }}</div>
-					<div class="step-description">{{ preparation.description }}</div>
+				<div class="meta-badges">
+					{% for tag in tags %}
+					<span class="tag-badge" style="{{ tag.style }}">{{ tag.nom }}</span>
+					{% endfor %}
 				</div>
-				{% endif %} {% endfor %}
 			</div>
 		</div>
 
-		{% if recette.conseil %}
+		<div class="section-title">Ingrédients</div>
+		<ul class="ingredients-list">
+			{% for ingredient in ingredients %} {% if ingredient.isSection %}
+			<div class="ingredient-section-title">{{ ingredient.nom|default:"" }}</div>
+			{% else %}
+			<li>
+				<span class="ingredient-quantite">
+					{% if ingredient.quantite %}{{ ingredient.quantite }}{% endif %} {% if ingredient.unite %}{{ ingredient.unite.code|default:"" }}{% endif %}
+				</span>
+				<span class="ingredient-nom">{{ ingredient.nom|default:"" }}</span>
+			</li>
+			{% endif %} {% endfor %}
+		</ul>
+
+		<div class="section-title">Préparation</div>
+		{% for preparation in preparations %} {% if preparation.isSection %}
+		<div class="preparation-section-title">{{ preparation.description }}</div>
+		{% else %}
+		<div class="preparation-step">
+			<div class="step-number">{{ preparation.numero }}</div>
+			<div class="step-description">{{ preparation.description }}</div>
+		</div>
+		{% endif %} {% endfor %} {% if recette.conseil %}
 		<div class="conseil-box">
 			<strong>Conseil du chef</strong>
 			{{ recette.conseil }}

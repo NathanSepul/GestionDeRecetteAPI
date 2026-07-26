@@ -1,5 +1,6 @@
 .env
 .generateSecureKey.py
+.vscode
 
 # Django #
 *.log

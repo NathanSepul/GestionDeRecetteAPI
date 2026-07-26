@@ -65,7 +65,6 @@ ROOT_URLCONF = 'gestionDeRecette.urls'
 
 # Nécessaire pour que Django fasse confiance au proxy Nginx
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-USE_X_FORWARDED_HOST = True
 CSRF_USE_SESSIONS = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_TRUSTED_ORIGINS =  ['https://sepul.be', 'https://www.sepul.be']
@@ -204,7 +203,6 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'Petite application permettant de gerer des recette',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
-    'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
 }
 
 
