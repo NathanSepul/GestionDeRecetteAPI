@@ -4,8 +4,11 @@ from django.http import HttpResponse
 from weasyprint import HTML
 from tag.models import Tag
 from .models import Recette, Ingredient, Preparation
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 
-
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def generer_pdf(request, recette_id):
     recette = get_object_or_404(Recette, pk=recette_id)
     ingredients = Ingredient.objects.filter(recette=recette).select_related('produit', 'unite').order_by('noOrdre')
@@ -58,5 +61,5 @@ def generer_pdf(request, recette_id):
     pdf = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
     response = HttpResponse(pdf, content_type="application/pdf")
     filename = f"{recette.titre}.pdf"
-    response["Content-Disposition"] = f'attachement; filename="{filename}"'
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
