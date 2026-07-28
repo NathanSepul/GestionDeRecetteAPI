@@ -6,11 +6,18 @@ from tag.models import Tag
 from .models import Recette, Ingredient, Preparation
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
+from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
 
+@extend_schema(
+    tags=['Recette'],
+    responses={200: OpenApiTypes.BINARY},
+    description="Génère le PDF de la recette"
+)
 @api_view(['GET'])
 @permission_classes([AllowAny])
-def generer_pdf(request, recette_id):
-    recette = get_object_or_404(Recette, pk=recette_id)
+def generer_pdf(request, id):
+    recette = get_object_or_404(Recette, pk=id)
     ingredients = Ingredient.objects.filter(recette=recette).select_related('produit', 'unite').order_by('noOrdre')
     preparations = Preparation.objects.filter(recette=recette).order_by('noOrdre')
 

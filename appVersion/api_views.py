@@ -10,12 +10,16 @@ from rest_framework import generics, permissions
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView 
-
+from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
 
 class DownloadAPIView(APIView):
     permission_classes = [permissions.AllowAny]
 
-    @extend_schema(tags=['AppVersion'])
+    @extend_schema(
+    tags=['AppVersion'],
+    responses={200: OpenApiTypes.BINARY},
+    )
     def get(self, request,support):
         filename = f"{settings.APP_NAME}.{support}.zip"
         path_to_file = os.path.join(settings.MEDIA_ROOT, f'uploads/{support}', filename)

@@ -15,6 +15,6 @@ router.register(r'', RecetteViewSet, basename='')
 urlpatterns = [
     path('produit/', recette.api_views.ProduitListAPIView.as_view()),
     path('unite/', recette.api_views.UniteListAPIView.as_view()),
-    path("<int:recette_id>/pdf/", generer_pdf, name="recette_pdf"),
+    path("<int:id>/pdf/", generer_pdf, name="recette_pdf"),
     path('', include(router.urls)),
 ]
