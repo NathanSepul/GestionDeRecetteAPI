@@ -17,12 +17,12 @@ api_urlpattern = [
     path("api/token/verify/", MyTokenVerifyView.as_view(), name="token_verify"),
     
     path('api/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     
 ]
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path('schema/', SpectacularAPIView.as_view(), name='schema'),
 ]
 
 urlpatterns += api_urlpattern
