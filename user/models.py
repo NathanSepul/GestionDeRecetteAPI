@@ -31,9 +31,10 @@ class UserManager(BaseUserManager):
         user.save(using=self._db)
 
         import typeRecette.models
-        typeRecette.models.TypeRecette.objects.create( user=user,  noOrdre=1, type="Entrée")
-        typeRecette.models.TypeRecette.objects.create( user=user,  noOrdre=2, type="Plat")
-        typeRecette.models.TypeRecette.objects.create( user=user,  noOrdre=3, type="Dessert")
+        typeRecette.models.TypeRecette.objects.create( user=user, noOrdre=10, type="Apéro")
+        typeRecette.models.TypeRecette.objects.create( user=user, noOrdre=20, type="Entrée")
+        typeRecette.models.TypeRecette.objects.create( user=user, noOrdre=30, type="Plat")
+        typeRecette.models.TypeRecette.objects.create( user=user, noOrdre=40, type="Dessert")
 
         import tag.models
         tag.models.Tag.objects.create( user=user, tag="Poisson", red=81, green=88, blue=192, opacite=210)

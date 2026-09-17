@@ -34,6 +34,9 @@ class MyRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = user.models.User
         fields = ('email', 'first_name', 'last_name', 'password', 'language')
+    
+    def create(self, validated_data):
+        return  user.models.User.objects.create_user(**validated_data)
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
 
