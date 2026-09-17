@@ -139,7 +139,12 @@ class IngredientViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         """Assigne automatiquement l'utilisateur lors de la création."""
+        from rest_framework.exceptions import PermissionDenied
         recette_instance = serializer.validated_data.get('recette')
+
+        if recette_instance.user_id != self.request.user.id:
+            raise PermissionDenied("Vous n'êtes pas propriétaire de cette recette.")
+
         max_no_ordre = Ingredient.objects.filter(recette=recette_instance).aggregate(Max('noOrdre'))['noOrdre__max']
         next_no_ordre = (max_no_ordre + 1) if max_no_ordre is not None else 0
         serializer.save(noOrdre=next_no_ordre)
@@ -209,11 +214,17 @@ class PreparationViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         """Assigne automatiquement l'utilisateur lors de la création."""
+        from rest_framework.exceptions import PermissionDenied
+
         recette_instance = serializer.validated_data.get('recette')
-        max_no_ordre = Preparation.objects.filter( recette=recette_instance).aggregate(Max('noOrdre'))['noOrdre__max']
+
+        if recette_instance.user_id != self.request.user.id:
+            raise PermissionDenied("Vous n'êtes pas propriétaire de cette recette.")
+
+        max_no_ordre = Preparation.objects.filter(recette=recette_instance).aggregate(Max('noOrdre'))['noOrdre__max']
         next_no_ordre = (max_no_ordre + 1) if max_no_ordre is not None else 0
         serializer.save(noOrdre=next_no_ordre)
-    
+        
     @action(detail=True, methods=['post'], serializer_class=ReorderPreparationSerializer)
     def reorder(self, request, pk=None):
         """Réorganise l'ordre d'une étape spécifique."""
