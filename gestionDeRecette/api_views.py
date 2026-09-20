@@ -14,24 +14,28 @@ from rest_framework_simplejwt.views import (
 
 class IsOwner(permissions.BasePermission):
     """
-    Autorise la lecture à tous les utilisateurs authentifiés.
-    N'autorise l'écriture (update/delete) qu'au propriétaire de l'objet.
-    """
-
-    """
     - Lecture (GET, HEAD, OPTIONS) : autorisée à tout utilisateur authentifié.
-    - Écriture (POST, PUT, PATCH, DELETE) : autorisée uniquement au propriétaire
-      de la recette (directement ou via la relation recette_id).
+    - Écriture (PUT, PATCH, DELETE) : autorisée uniquement au propriétaire.
     """
 
     def has_object_permission(self, request, view, obj):
+        # 1. Lecture autorisée pour tout le monde (SAFE_METHODS)
         if request.method in permissions.SAFE_METHODS:
             return True
 
+        # 2. Si l'objet est directement l'utilisateur (ex: UserViewSet)
+        if obj == request.user:
+            return True
+
+        # 3. Si l'objet est lié à un utilisateur (ex: Recette, Commentaire...)
         if hasattr(obj, 'user_id'):
             return obj.user_id == request.user.id
+            
+        if hasattr(obj, 'user'):
+            return obj.user == request.user
 
-        if hasattr(obj, 'recette_id'):
+        # 4. Si l'objet est lié à une recette (ex: IngrédientRecette...)
+        if hasattr(obj, 'recette') and hasattr(obj.recette, 'user_id'):
             return obj.recette.user_id == request.user.id
 
         return False

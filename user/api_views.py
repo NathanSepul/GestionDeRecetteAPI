@@ -6,6 +6,7 @@ from django.template.loader import render_to_string
 from rest_framework import generics, permissions, viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from gestionDeRecette.api_views import IsOwner
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from rest_registration import signals
@@ -29,6 +30,7 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     filter_backends = [filters.SearchFilter]
+    Permission_classes = [permissions.IsAuthenticated, IsOwner]
     search_fields = ['email', 'first_name', 'last_name']
     
     def get_serializer_class(self):
