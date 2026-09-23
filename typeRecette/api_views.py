@@ -7,6 +7,7 @@ from django.db.models import Max
 from gestionDeRecette.api_views import IsOwner
 from typeRecette.models import TypeRecette
 from typeRecette.serializer import TypeRecetteSerializer, ReorderTypeRecetteSerializer
+from django.db.models import Count
 
 @extend_schema(tags=['Type de recette'])
 class TypeRecetteViewSet(viewsets.ModelViewSet):
@@ -26,7 +27,7 @@ class TypeRecetteViewSet(viewsets.ModelViewSet):
         if userID:
             queryset = queryset.filter(user_id=userID)
         
-        return queryset.order_by('noOrdre')
+        return queryset.annotate(recipe_count=Count('recette')).order_by('noOrdre')
     
     def perform_create(self, serializer):
         """Assigne automatiquement l'utilisateur lors de la création."""

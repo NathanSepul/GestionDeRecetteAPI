@@ -4,10 +4,11 @@ import typeRecette.models
 
 
 class TypeRecetteSerializer(serializers.ModelSerializer):
+    recipeCount = serializers.IntegerField(source='recipe_count', read_only=True)
 
     class Meta:
         model = typeRecette.models.TypeRecette
-        fields = ['id', 'noOrdre', 'type', ]
+        fields = ['id', 'noOrdre', 'type', 'recipeCount' ]
 
 class ReorderTypeRecetteSerializer(serializers.Serializer):
     newPosition = serializers.IntegerField(min_value=0)
