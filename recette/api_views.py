@@ -9,6 +9,12 @@ from recette.models import *
 from recette.serializer import  *
 from django.db.models import Max
 
+import os
+from django.core.files.base import ContentFile
+from django.shortcuts import get_object_or_404
+from django.db import IntegrityError
+from typeRecette.models import TypeRecette
+
     
 @extend_schema(tags=['Recette'])
 class RecetteViewSet(viewsets.ModelViewSet):
@@ -112,8 +118,112 @@ class RecetteViewSet(viewsets.ModelViewSet):
                 return Response(self.get_serializer(updated_instance).data)
         except Exception as e:
             return Response(f"An error occurred during update recette: {e}", status=status.HTTP_400_BAD_REQUEST)
+   
+    @action(detail=False, methods=['post'], url_path='import', serializer_class=ImportRecetteSerializer)
+    def import_recette(self, request):
+        """Importe une copie d'une recette d'un autre utilisateur (sans le type ni les tags)."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        recette_id = serializer.validated_data['recetteId']
+        type_recette_id = serializer.validated_data['typeRecette']
 
+        # La recette source peut appartenir à n'importe quel utilisateur
+        source_recette = get_object_or_404(Recette, pk=recette_id)
+
+        # Le type doit obligatoirement appartenir à l'utilisateur connecté
+        type_recette = get_object_or_404(TypeRecette, pk=type_recette_id, user=request.user)
+
+        try:
+            with transaction.atomic():
+                new_recette = Recette.objects.create(
+                    user=request.user,
+                    titre=source_recette.titre,
+                    portion=source_recette.portion,
+                    typeRecette=type_recette,
+                    conseil=source_recette.conseil,
+                )
+
+                # Copie de l'image (nouveau fichier physique, pas juste une référence)
+                if source_recette.image:
+                    new_recette.image.save(
+                        os.path.basename(source_recette.image.name),
+                        ContentFile(source_recette.image.read()),
+                        save=True,
+                    )
+
+                # Copie des ingrédients
+                for ingredient in source_recette.ingredient_set.all().order_by('noOrdre'):
+                    Ingredient.objects.create(
+                        recette=new_recette,
+                        noOrdre=ingredient.noOrdre,
+                        isSection=ingredient.isSection,
+                        quantite=ingredient.quantite,
+                        nom=ingredient.nom,
+                        unite=ingredient.unite,
+                        produit=ingredient.produit,
+                    )
+
+                # Copie des préparations
+                for preparation in source_recette.preparation_set.all().order_by('noOrdre'):
+                    Preparation.objects.create(
+                        recette=new_recette,
+                        noOrdre=preparation.noOrdre,
+                        isSection=preparation.isSection,
+                        description=preparation.description,
+                    )
+
+        except IntegrityError:
+            return Response(
+                {"detail": "Une recette avec ce titre existe déjà pour ce type de recette."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        result_serializer = RecetteSerializer(new_recette)
+        return Response(result_serializer.data, status=status.HTTP_201_CREATED)
     
+    @action(detail=False, methods=['post'], url_path='liste-course', serializer_class=ListeCourseRequestSerializer)
+    def liste_course(self, request):
+        """Génère la liste de course agrégée (par produit) pour une recette et un nombre de portions donné."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        recette = get_object_or_404(Recette, pk=serializer.validated_data['recetteId'])
+        desired_portion = serializer.validated_data['portion']
+
+        scaling_factor = (
+            Decimal(desired_portion) / Decimal(recette.portion)
+            if recette.portion else Decimal(1)
+        )
+
+        aggregated = {}
+        
+        for ingredient in recette.ingredient_set.filter(isSection=False):
+            if ingredient.quantite is not None:
+                scaled_qty = (ingredient.quantite * scaling_factor).quantize(Decimal('0.01'))
+            else:
+                scaled_qty = None  # ex: "sel, au goût" -> pas de quantité à sommer
+
+            if ingredient.produit_id:
+                key = ('produit', ingredient.produit_id, ingredient.unite_id)
+            else:
+                key = ('nom', ingredient.nom, ingredient.unite_id)
+
+            if key not in aggregated:
+                aggregated[key] = {
+                    'produit': ingredient.produit,
+                    'nom': ingredient.nom if not ingredient.produit_id else None,
+                    'unite': ingredient.unite,
+                    'quantite': None,
+                }
+
+            if scaled_qty is not None:
+                current = aggregated[key]['quantite']
+                aggregated[key]['quantite'] = scaled_qty if current is None else current + scaled_qty
+
+        results = list(aggregated.values())
+        results.sort(key=lambda x: (x['produit'].nom if x['produit'] else (x['nom'] or '')).lower())
+
+        result_serializer = ListeCourseItemSerializer(results, many=True)
+        return Response(result_serializer.data, status=status.HTTP_200_OK)
 ########################
 ########################
 

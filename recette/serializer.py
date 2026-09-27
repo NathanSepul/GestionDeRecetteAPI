@@ -15,7 +15,10 @@ class RecetteSerializer(serializers.ModelSerializer):
     class Meta:
         model = recette.models.Recette
         fields = ['id', 'titre', 'portion', 'typeRecette','image','conseil', 'adapteQuantity', 'user_id' ]
-        
+
+class ImportRecetteSerializer(serializers.Serializer):
+    recetteId = serializers.IntegerField()
+    typeRecette = serializers.IntegerField()
 # 
 # ----------------------------------
 # ----------------------------------
@@ -72,3 +75,18 @@ class ReorderPreparationSerializer(serializers.Serializer):
         fields = ['id', 'noOrdre', 'isSection', 'description', 'recette' ]
 
 
+# 
+# ----------------------------------
+# ----------------------------------
+#
+ 
+class ListeCourseRequestSerializer(serializers.Serializer):
+    recetteId = serializers.IntegerField()
+    portion = serializers.IntegerField(min_value=1)
+
+
+class ListeCourseItemSerializer(serializers.Serializer):
+    produit = ProduitSerializer(allow_null=True)
+    unite = UniteSerializer(allow_null=True)
+    quantite = serializers.DecimalField(max_digits=9, decimal_places=2, allow_null=True)
+    
