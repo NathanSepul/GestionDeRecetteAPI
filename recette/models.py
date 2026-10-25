@@ -1,6 +1,4 @@
-import base64
 import os
-from typing import Optional
 import uuid
 from django.db import models
 from typeRecette.models import TypeRecette
@@ -8,9 +6,11 @@ from user.models import User
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.text import slugify
-from django.contrib.staticfiles.storage import staticfiles_storage
 from django.db.models.signals import post_delete, pre_save
 from django.dispatch import receiver
+from django.db import models
+from django.db.models import Q
+from django.core.exceptions import ValidationError
 
 def path_and_rename(instance, filename):
         ext = filename.split('.')[-1]
@@ -24,13 +24,12 @@ class Recette(models.Model):
     titre = models.CharField(max_length=100)
     portion = models.IntegerField(blank=False, null=False)
     typeRecette = models.ForeignKey(TypeRecette, on_delete=models.CASCADE, verbose_name=_("Type de recette"))
-    imageOld = models.BinaryField(blank=True, null=True)
     image = models.ImageField(upload_to=path_and_rename, blank=True, null=True,)
     conseil = models.TextField(blank=True, null=True)
 
     class Meta:
         db_table = 'recette'
-        unique_together = (('titre', 'typeRecette'),)
+        constraints = [models.UniqueConstraint(fields=['titre', 'typeRecette'], name='UniciteRecetteTypeRecetteParUtilisateur')]
         verbose_name = "recette"
         verbose_name_plural = "recettes"
     
@@ -73,7 +72,7 @@ class Produit(models.Model):
     nom = models.TextField(unique=True)
     nomPluriel =  models.TextField()
     produitDeBase = models.ForeignKey('self', on_delete=models.PROTECT, verbose_name=_("Produit de base"),blank=True,null=True)
-    determinant =  models.TextField(max_length=5,blank=True,null=True)
+    determinant =  models.CharField(max_length=5, blank=True, null=True)
 
     class Meta:
         db_table = 'produit'
@@ -84,20 +83,35 @@ class Produit(models.Model):
         return self.nom
 
 class Unite(models.Model):
-    code = models.TextField(max_length=5)
+    code = models.CharField(max_length=5)
     description = models.TextField()
-    borneSuperieur = models.IntegerField(blank=True,null=True)
-    uniteSuperieur = models.ForeignKey('self', on_delete=models.PROTECT, verbose_name=_("Unité superieur"),blank=True,null=True)
+    borneSuperieur = models.IntegerField(blank=True, null=True)
+    uniteSuperieur = models.ForeignKey(
+        'self', on_delete=models.PROTECT,
+        verbose_name=_("Unité superieur"), blank=True, null=True
+    )
 
     class Meta:
         db_table = 'unite'
         verbose_name = "unité"
         verbose_name_plural = "unités"
-    
-    def __str__(self):
-        if (len(self.description) > 30):
-            return "%s..." % self.description[:30]
-        return self.description
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(borneSuperieur__isnull=True, uniteSuperieur__isnull=True)
+                    | Q(borneSuperieur__isnull=False, uniteSuperieur__isnull=False)
+                ),
+                name="unite_borne_et_unite_superieure_ensemble",
+            ),
+        ]
+        
+    def clean(self):
+        super().clean()
+        if self.pk and self.uniteSuperieur_id == self.pk:
+            raise ValidationError(
+                {"uniteSuperieur": _("Une unité ne peut pas être sa propre unité supérieure.")}
+            )
+
 
 class Ingredient(models.Model):
     recette = models.ForeignKey(Recette,on_delete= models.CASCADE, verbose_name=_("Recette"))
