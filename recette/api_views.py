@@ -47,7 +47,7 @@ class RecetteViewSet(viewsets.ModelViewSet):
                 
                 if tag_ids: 
                     for tag_id in tag_ids:
-                        queryset = queryset.filter(tag__id=tag_id)
+                        queryset = queryset.filter(tags__id=tag_id)
                 else:
                     pass 
 
