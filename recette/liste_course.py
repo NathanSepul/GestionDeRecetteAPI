@@ -58,7 +58,30 @@ def _vers_produit_achete(produit, quantite, unite, unites_par_id):
     return produit, quantite, unite
 
 
-def construire_liste_course(ingredients, scaling_factor, unites_par_id, rayons_par_id=None):
+def generer_liste_course(portions_par_recette):
+    """
+    Liste de courses de plusieurs recettes : {recette: nombre de portions voulu} -> lignes agrégées.
+    Charge en une fois unités et rayons (une dizaine chacun) pour éviter une requête par ligne.
+    """
+    from recette.models import Ingredient, Rayon, Unite
+
+    facteurs_par_recette = {
+        recette.id: (Decimal(portion) / Decimal(recette.portion)) if recette.portion else Decimal(1)
+        for recette, portion in portions_par_recette.items()
+    }
+    unites_par_id = {unite.id: unite for unite in Unite.objects.all()}
+    rayons_par_id = {rayon.id: rayon for rayon in Rayon.objects.all()}
+
+    ingredients = Ingredient.objects.filter(
+        recette_id__in=facteurs_par_recette, isSection=False,
+    ).select_related('produit__produitDeBase')
+    for ingredient in ingredients:
+        ingredient.unite = unites_par_id.get(ingredient.unite_id)
+
+    return construire_liste_course(ingredients, facteurs_par_recette, unites_par_id, rayons_par_id)
+
+
+def construire_liste_course(ingredients, facteurs_par_recette, unites_par_id, rayons_par_id=None):
     """
     Agrège les ingrédients par produit acheté (produit de base, ou nom libre) et par dimension d'unité :
     200 g + 0,5 kg de beurre -> 700 g ; 1 cs + 1 cc d'huile -> 20 ml ;
@@ -73,7 +96,8 @@ def construire_liste_course(ingredients, scaling_factor, unites_par_id, rayons_p
 
     for ingredient in ingredients:
         unite = ingredient.unite
-        quantite = ingredient.quantite * scaling_factor if ingredient.quantite is not None else None
+        facteur_portion = facteurs_par_recette.get(ingredient.recette_id, Decimal(1))
+        quantite = ingredient.quantite * facteur_portion if ingredient.quantite is not None else None
         produit = None
         if ingredient.produit_id:
             produit, quantite, unite = _vers_produit_achete(ingredient.produit, quantite, unite, unites_par_id)

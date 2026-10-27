@@ -11,8 +11,8 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from gestionDeRecette.api_views import IsOwner
 from gestionDeRecette.utils import reorder
-from recette.liste_course import construire_liste_course
-from recette.models import Recette, Ingredient, Preparation, Produit, Rayon, Unite
+from recette.liste_course import generer_liste_course
+from recette.models import Recette, Ingredient, Preparation, Produit, Unite
 from recette.serializer import (
     RecetteSerializer, ImportRecetteSerializer, ProduitSerializer, UniteSerializer,
     IngredientSerializer, ReorderIngredientSerializer, PreparationSerializer, ReorderPreparationSerializer,
@@ -190,21 +190,7 @@ class RecetteViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         recette = get_object_or_404(Recette, pk=serializer.validated_data['recetteId'])
-        desired_portion = serializer.validated_data['portion']
-
-        scaling_factor = (
-            Decimal(desired_portion) / Decimal(recette.portion)
-            if recette.portion else Decimal(1)
-        )
-
-        # toutes les unités en mémoire (une dizaine) : évite une requête par unité supérieure
-        unites_par_id = {unite.id: unite for unite in Unite.objects.all()}
-        ingredients = recette.ingredient_set.filter(isSection=False).select_related('produit__produitDeBase')
-        for ingredient in ingredients:
-            ingredient.unite = unites_par_id.get(ingredient.unite_id)
-
-        rayons_par_id = {rayon.id: rayon for rayon in Rayon.objects.all()}
-        results = construire_liste_course(ingredients, scaling_factor, unites_par_id, rayons_par_id)
+        results = generer_liste_course({recette: serializer.validated_data['portion']})
 
         result_serializer = ListeCourseItemSerializer(results, many=True)
         return Response(result_serializer.data, status=status.HTTP_200_OK)

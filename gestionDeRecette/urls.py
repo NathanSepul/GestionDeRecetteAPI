@@ -11,7 +11,8 @@ api_urlpattern = [
     path("api/tag/", include("tag.api_urls")),
     path("api/user/", include("user.api_urls")),
     path("api/appVersion/", include("appVersion.api_urls")),
-    
+    path("api/listeCourse/", include("listeCourse.api_urls")),
+
     path("api/login/", MyLogin.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", MyTokenRefreshView.as_view(), name="token_refresh"),
     path("api/token/verify/", MyTokenVerifyView.as_view(), name="token_verify"),

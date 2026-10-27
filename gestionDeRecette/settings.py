@@ -41,7 +41,8 @@ INSTALLED_APPS = [
     'recette',
     'tag',
     'appVersion',
-# 
+    'listeCourse',
+#
     'rest_framework',
     'rest_registration',
     'rest_framework_simplejwt',
