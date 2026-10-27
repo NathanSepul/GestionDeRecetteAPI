@@ -30,7 +30,7 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     filter_backends = [filters.SearchFilter]
-    Permission_classes = [permissions.IsAuthenticated, IsOwner]
+    permission_classes = [permissions.IsAuthenticated, IsOwner]
     search_fields = ['email', 'first_name', 'last_name']
     
     def get_serializer_class(self):
@@ -50,7 +50,8 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(LanguageSerializers(user).data)
 
     # Action pour S'abonner / Se désabonner
-    @action(detail=True, methods=['post'])
+    # IsOwner bloquerait le POST sur le profil d'un autre : suivre quelqu'un ne modifie que request.user
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def follow(self, request, pk=None):
         user_to_follow = self.get_object()
         me = request.user

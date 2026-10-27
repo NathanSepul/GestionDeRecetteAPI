@@ -56,8 +56,8 @@ class TagViewSet(viewsets.ModelViewSet):
         """Lie un tag à une recette."""
         serializer = TagRecetteLinkSerializer(data=request.data)
         if serializer.is_valid():
-            recette = get_object_or_404(Recette, id=serializer.validated_data['recette_id'])
-            tag = get_object_or_404(Tag, id=serializer.validated_data['tag_id'])
+            recette = get_object_or_404(Recette, id=serializer.validated_data['recette_id'], user=request.user)
+            tag = get_object_or_404(Tag, id=serializer.validated_data['tag_id'], user=request.user)
             
             tag.recettes.add(recette)
             return Response(status=status.HTTP_201_CREATED)
@@ -69,8 +69,8 @@ class TagViewSet(viewsets.ModelViewSet):
         """Délie un tag d'une recette."""
         serializer = TagRecetteLinkSerializer(data=request.data)
         if serializer.is_valid():
-            recette = get_object_or_404(Recette, id=serializer.validated_data['recette_id'])
-            tag = get_object_or_404(Tag, id=serializer.validated_data['tag_id'])
+            recette = get_object_or_404(Recette, id=serializer.validated_data['recette_id'], user=request.user)
+            tag = get_object_or_404(Tag, id=serializer.validated_data['tag_id'], user=request.user)
             
             tag.recettes.remove(recette)
             return Response(status=status.HTTP_204_NO_CONTENT)
