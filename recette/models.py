@@ -45,8 +45,26 @@ class Recette(models.Model):
 register_image_cleanup(Recette, 'image')
    
     
+class Rayon(models.Model):
+    """Rayon du magasin : la liste de courses suit l'ordre de parcours (noOrdre)."""
+    nom = models.CharField(max_length=50, unique=True)
+    noOrdre = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = 'rayon'
+        verbose_name = "rayon"
+        verbose_name_plural = "rayons"
+        ordering = ['noOrdre', 'nom']
+
+    def __str__(self):
+        return self.nom
+
+
 class Produit(models.Model):
     nom = models.TextField(unique=True)
+    rayon = models.ForeignKey(Rayon, on_delete=models.SET_NULL, blank=True, null=True)
+    # sel, huile, épices... : en principe déjà à la maison, listés à part ("à vérifier dans le placard")
+    placard = models.BooleanField(default=False)
     nomPluriel =  models.TextField()
     produitDeBase = models.ForeignKey('self', on_delete=models.PROTECT, verbose_name=_("Produit de base"),blank=True,null=True)
     determinant =  models.CharField(max_length=5, blank=True, null=True)

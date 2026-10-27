@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from gestionDeRecette.api_views import IsOwner
 from gestionDeRecette.utils import reorder
 from recette.liste_course import construire_liste_course
-from recette.models import Recette, Ingredient, Preparation, Produit, Unite
+from recette.models import Recette, Ingredient, Preparation, Produit, Rayon, Unite
 from recette.serializer import (
     RecetteSerializer, ImportRecetteSerializer, ProduitSerializer, UniteSerializer,
     IngredientSerializer, ReorderIngredientSerializer, PreparationSerializer, ReorderPreparationSerializer,
@@ -203,7 +203,8 @@ class RecetteViewSet(viewsets.ModelViewSet):
         for ingredient in ingredients:
             ingredient.unite = unites_par_id.get(ingredient.unite_id)
 
-        results = construire_liste_course(ingredients, scaling_factor, unites_par_id)
+        rayons_par_id = {rayon.id: rayon for rayon in Rayon.objects.all()}
+        results = construire_liste_course(ingredients, scaling_factor, unites_par_id, rayons_par_id)
 
         result_serializer = ListeCourseItemSerializer(results, many=True)
         return Response(result_serializer.data, status=status.HTTP_200_OK)

@@ -3,19 +3,27 @@ import recette.models
 
 @admin.register(recette.models.Produit)
 class ProduitAdmin(admin.ModelAdmin):
-    list_display = ( 'nom','nomPluriel','produitDeBase', 'ratio_texte')
+    list_display = ( 'nom','nomPluriel','rayon', 'placard', 'produitDeBase', 'ratio_texte')
+    list_editable = ('rayon', 'placard')
+    list_filter = ('rayon', 'placard')
     readonly_fields =[ 'id', 'ratio_texte']
     list_per_page = 20
     search_fields = ('nom',)
     ordering = ('nom',)
     raw_id_fields = ('produitDeBase',)
     fieldsets = (
-        (None, {'fields': ('id', 'nom', 'nomPluriel', 'determinant')}),
+        (None, {'fields': ('id', 'nom', 'nomPluriel', 'determinant', 'rayon', 'placard')}),
         ('Produit de base', {
             'fields': ('produitDeBase', ('ratioQuantiteBase', 'ratioUniteBase'), ('ratioQuantite', 'ratioUnite'), 'ratio_texte'),
             'description': "Ex. 1 gousse d'ail = 1 cc d'ail haché. Sans ratio : 1 pour 1, dans la même unité.",
         }),
     )
+
+@admin.register(recette.models.Rayon)
+class RayonAdmin(admin.ModelAdmin):
+    list_display = ('nom', 'noOrdre')
+    list_editable = ('noOrdre',)
+    ordering = ('noOrdre',)
 
 @admin.register(recette.models.Unite)
 class UniteAdmin(admin.ModelAdmin):

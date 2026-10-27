@@ -58,7 +58,7 @@ def _vers_produit_achete(produit, quantite, unite, unites_par_id):
     return produit, quantite, unite
 
 
-def construire_liste_course(ingredients, scaling_factor, unites_par_id):
+def construire_liste_course(ingredients, scaling_factor, unites_par_id, rayons_par_id=None):
     """
     Agrège les ingrédients par produit acheté (produit de base, ou nom libre) et par dimension d'unité :
     200 g + 0,5 kg de beurre -> 700 g ; 1 cs + 1 cc d'huile -> 20 ml ;
@@ -66,7 +66,9 @@ def construire_liste_course(ingredients, scaling_factor, unites_par_id):
     Les unités non convertibles (pincée...) ne s'additionnent qu'entre elles.
     Un même produit dans deux dimensions (2 oignons + 150 g d'oignon) reste sur deux lignes.
     Les quantités sans unité (pièces) sont arrondies à l'unité supérieure : on n'achète pas 3,75 citrons.
+    Tri : par rayon (ordre de parcours), produits sans rayon ensuite, produits "placard" en dernier.
     """
+    rayons_par_id = rayons_par_id or {}
     groupes = {}
 
     for ingredient in ingredients:
@@ -134,13 +136,20 @@ def construire_liste_course(ingredients, scaling_factor, unites_par_id):
             if unite is None:
                 quantite = quantite.quantize(Decimal('1'), rounding=ROUND_CEILING)
 
+        produit = groupe['produit']
         resultats.append({
-            'produit': groupe['produit'],
+            'produit': produit,
             'nom': groupe['nom'],
             'precision': ', '.join(sorted(groupe['derives'])) or None,
             'unite': unite,
             'quantite': quantite,
+            'rayon': rayons_par_id.get(produit.rayon_id) if produit else None,
+            'placard': produit.placard if produit else False,
         })
 
-    resultats.sort(key=lambda x: (x['produit'].nom if x['produit'] else (x['nom'] or '')).lower())
+    resultats.sort(key=lambda x: (
+        x['placard'],
+        x['rayon'].noOrdre if x['rayon'] else float('inf'),
+        (x['produit'].nom if x['produit'] else (x['nom'] or '')).lower(),
+    ))
     return resultats

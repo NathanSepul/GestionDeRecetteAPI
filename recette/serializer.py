@@ -95,7 +95,15 @@ class ListeCourseRequestSerializer(serializers.Serializer):
     portion = serializers.IntegerField(min_value=1)
 
 
+class RayonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = recette.models.Rayon
+        fields = ['id', 'nom', 'noOrdre']
+
+
 class ListeCourseItemSerializer(serializers.Serializer):
+    rayon = RayonSerializer(allow_null=True)
+    placard = serializers.BooleanField()
     produit = ProduitSerializer(allow_null=True)
     nom = serializers.CharField(allow_null=True)  # ingrédient sans produit lié : le front affiche ce nom
     precision = serializers.CharField(allow_null=True)  # produits regroupés sous ce produit de base ("jus de citron")
