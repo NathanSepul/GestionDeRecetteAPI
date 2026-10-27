@@ -1,6 +1,10 @@
+import logging
 import os
 from django.db import transaction
 from django.db.models.signals import post_delete, post_save, pre_save
+from gestionDeRecette.images import delete_variants, generate_variants
+
+logger = logging.getLogger(__name__)
 
 
 def reorder(obj_to_move, siblings, new_position):
@@ -15,15 +19,27 @@ def reorder(obj_to_move, siblings, new_position):
     return ordered
 
 
+def _generate_variants_safely(path):
+    # Une image illisible ne doit pas faire échouer la requête : l'original reste servi
+    try:
+        generate_variants(path)
+    except Exception:
+        logger.exception("Impossible de générer les variantes de %s", path)
+
+
 def _remove_file(path):
-    if path and os.path.isfile(path):
+    if not path:
+        return
+    delete_variants(path)
+    if os.path.isfile(path):
         os.remove(path)
 
 
 def register_image_cleanup(model, field_name):
     """
-    Supprime du disque l'image d'un modèle quand elle est remplacée ou quand l'objet est supprimé.
-    La suppression n'a lieu qu'après le commit : si l'enregistrement échoue, l'ancien fichier est conservé.
+    Supprime du disque l'image d'un modèle (et ses variantes) quand elle est remplacée ou quand l'objet est supprimé,
+    et génère les variantes redimensionnées de la nouvelle image.
+    Ces opérations n'ont lieu qu'après le commit : si l'enregistrement échoue, l'ancien fichier est conservé.
     """
     storage = model._meta.get_field(field_name).storage
     uid = f"{model._meta.label}.{field_name}"
@@ -43,6 +59,12 @@ def register_image_cleanup(model, field_name):
         if path:
             transaction.on_commit(lambda: _remove_file(path))
 
+    def create_variants(sender, instance, **kwargs):
+        file = getattr(instance, field_name)
+        if file:
+            path = file.path
+            transaction.on_commit(lambda: _generate_variants_safely(path))
+
     def delete_file(sender, instance, **kwargs):
         file = getattr(instance, field_name)
         if file:
@@ -51,4 +73,5 @@ def register_image_cleanup(model, field_name):
 
     pre_save.connect(remember_old_file, sender=model, weak=False, dispatch_uid=f"{uid}.pre_save")
     post_save.connect(delete_replaced_file, sender=model, weak=False, dispatch_uid=f"{uid}.post_save")
+    post_save.connect(create_variants, sender=model, weak=False, dispatch_uid=f"{uid}.variants")
     post_delete.connect(delete_file, sender=model, weak=False, dispatch_uid=f"{uid}.post_delete")

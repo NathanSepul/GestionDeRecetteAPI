@@ -7,14 +7,17 @@ from django.db.models import Max
 
 from tag.models import Tag
 from user.serializer import UserSerializer
+from gestionDeRecette.serializer import ImageVariantField
 
 class RecetteSerializer(serializers.ModelSerializer):
     adapteQuantity = serializers.BooleanField(default=True, write_only=True, required=False  )
     image = serializers.ImageField( required=False, max_length=None, use_url=True)
+    imageThumb = ImageVariantField('image', 'thumb')
+    imageMedium = ImageVariantField('image', 'medium')
     
     class Meta:
         model = recette.models.Recette
-        fields = ['id', 'titre', 'portion', 'typeRecette','image','conseil', 'adapteQuantity', 'user_id' ]
+        fields = ['id', 'titre', 'portion', 'typeRecette','image', 'imageThumb', 'imageMedium', 'conseil', 'adapteQuantity', 'user_id' ]
 
     def validate_typeRecette(self, value):
         """Le type de recette doit appartenir à l'utilisateur connecté (création comme modification)."""

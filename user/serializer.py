@@ -4,25 +4,28 @@ import user.models
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
+from gestionDeRecette.serializer import ImageVariantField
 
 
 
 class UserBaseSerializer(serializers.ModelSerializer):
     avatar = serializers.ImageField( required=False, max_length=None, use_url=True)
+    avatarThumb = ImageVariantField('avatar', 'thumb')
     
     class Meta:
         model = user.models.User
-        fields = ['id', 'email', 'first_name', 'last_name', 'avatar']
+        fields = ['id', 'email', 'first_name', 'last_name', 'avatar', 'avatarThumb']
 
 class UserSerializer(serializers.ModelSerializer):
     date_joined = serializers.DateTimeField(read_only=True)
     email = serializers.ReadOnlyField()
     isFollowed = serializers.SerializerMethodField()
     avatar = serializers.ImageField( required=False, max_length=None, use_url=True)
+    avatarThumb = ImageVariantField('avatar', 'thumb')
 
     class Meta:
         model = user.models.User
-        fields = ['id', 'email', 'first_name', 'last_name', 'date_joined', 'language', 'isFollowed', 'avatar']
+        fields = ['id', 'email', 'first_name', 'last_name', 'date_joined', 'language', 'isFollowed', 'avatar', 'avatarThumb']
     
     def get_isFollowed(self, obj):
         request = self.context.get('request')

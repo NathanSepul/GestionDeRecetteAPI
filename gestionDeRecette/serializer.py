@@ -1,7 +1,8 @@
 import math
-from rest_framework import pagination
+from rest_framework import pagination, serializers
 from rest_framework.response import Response
 from django.core.paginator import EmptyPage
+from gestionDeRecette.images import variant_url
 
 class MyPagination(pagination.PageNumberPagination):
     page_size_query_param = 'pageSize'
@@ -41,3 +42,15 @@ class MyPagination(pagination.PageNumberPagination):
             request.query_params._mutable = False
             
             return super().paginate_queryset(queryset, request, view)
+
+
+class ImageVariantField(serializers.Field):
+    """URL (lecture seule) d'une variante redimensionnée d'un ImageField, ou de l'original si elle n'existe pas encore."""
+
+    def __init__(self, image_field, variant, **kwargs):
+        self.image_field = image_field
+        self.variant = variant
+        super().__init__(source='*', read_only=True, **kwargs)
+
+    def to_representation(self, obj):
+        return variant_url(getattr(obj, self.image_field), self.variant, self.context.get('request'))
