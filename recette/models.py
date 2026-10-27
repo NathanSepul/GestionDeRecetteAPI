@@ -50,14 +50,45 @@ class Produit(models.Model):
     nomPluriel =  models.TextField()
     produitDeBase = models.ForeignKey('self', on_delete=models.PROTECT, verbose_name=_("Produit de base"),blank=True,null=True)
     determinant =  models.CharField(max_length=5, blank=True, null=True)
+    # ratio avec le produit de base : "1 gousse (d'ail) = 1 cc (d'ail haché)", "1 (citron) = 40 ml (de jus)".
+    # Unité vide = sans unité (pièce). Sans ratio : 1 pour 1, dans la même unité.
+    ratioQuantiteBase = models.DecimalField(_("Quantité de base"), max_digits=9, decimal_places=2, blank=True, null=True)
+    ratioUniteBase = models.ForeignKey('Unite', on_delete=models.PROTECT, verbose_name=_("Unité de base"), blank=True, null=True, related_name='+')
+    ratioQuantite = models.DecimalField(_("= quantité de ce produit"), max_digits=9, decimal_places=2, blank=True, null=True)
+    ratioUnite = models.ForeignKey('Unite', on_delete=models.PROTECT, verbose_name=_("Unité de ce produit"), blank=True, null=True, related_name='+')
 
     class Meta:
         db_table = 'produit'
         verbose_name = "produit"
         verbose_name_plural = "produits"
-    
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(ratioQuantiteBase__isnull=True, ratioQuantite__isnull=True)
+                    | Q(ratioQuantiteBase__gt=0, ratioQuantite__gt=0)
+                ),
+                name="produit_ratio_complet",
+            ),
+        ]
+
     def __str__(self):
         return self.nom
+
+    def ratio_texte(self):
+        if self.ratioQuantiteBase is None or not self.produitDeBase_id:
+            return ""
+        base = f"{self.ratioQuantiteBase.normalize():f} {self.ratioUniteBase or ''}".strip()
+        derive = f"{self.ratioQuantite.normalize():f} {self.ratioUnite or ''}".strip()
+        return f"{base} {self.produitDeBase} = {derive} {self.nom}"
+
+    ratio_texte.short_description = 'Ratio'
+
+    def clean(self):
+        super().clean()
+        if (self.ratioQuantiteBase is None) != (self.ratioQuantite is None):
+            raise ValidationError(_("Le ratio demande les deux quantités (base et produit)."))
+        if self.ratioQuantiteBase is not None and not self.produitDeBase_id:
+            raise ValidationError({"produitDeBase": _("Un ratio n'a de sens qu'avec un produit de base.")})
 
 class Unite(models.Model):
     class Dimension(models.TextChoices):

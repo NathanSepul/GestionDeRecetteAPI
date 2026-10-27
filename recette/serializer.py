@@ -98,6 +98,7 @@ class ListeCourseRequestSerializer(serializers.Serializer):
 class ListeCourseItemSerializer(serializers.Serializer):
     produit = ProduitSerializer(allow_null=True)
     nom = serializers.CharField(allow_null=True)  # ingrédient sans produit lié : le front affiche ce nom
+    precision = serializers.CharField(allow_null=True)  # produits regroupés sous ce produit de base ("jus de citron")
     unite = UniteSerializer(allow_null=True)
     quantite = serializers.DecimalField(max_digits=9, decimal_places=2, allow_null=True)
     

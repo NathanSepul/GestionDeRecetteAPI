@@ -199,7 +199,7 @@ class RecetteViewSet(viewsets.ModelViewSet):
 
         # toutes les unités en mémoire (une dizaine) : évite une requête par unité supérieure
         unites_par_id = {unite.id: unite for unite in Unite.objects.all()}
-        ingredients = recette.ingredient_set.filter(isSection=False).select_related('produit')
+        ingredients = recette.ingredient_set.filter(isSection=False).select_related('produit__produitDeBase')
         for ingredient in ingredients:
             ingredient.unite = unites_par_id.get(ingredient.unite_id)
 

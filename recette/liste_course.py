@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal
 
 PIECE = 'piece'
 
@@ -26,38 +26,91 @@ def _monter_unite(quantite_base, unite, unites_par_id):
     return unite
 
 
+def _appliquer_ratio(produit, quantite, unite, unites_par_id):
+    """
+    Convertit une quantité du produit en quantité de son produit de base grâce au ratio :
+    "1 gousse = 1 cc" -> 1 cs d'ail haché = 3 gousses d'ail. Sans ratio applicable (pas de ratio,
+    ou unité d'une autre dimension que celle du ratio) : 1 pour 1, dans la même unité.
+    """
+    if produit.ratioQuantite is None or quantite is None:
+        return quantite, unite
+
+    unite_ratio = unites_par_id.get(produit.ratioUnite_id)
+    dimension, facteur = _unite_info(unite)
+    dimension_ratio, facteur_ratio = _unite_info(unite_ratio)
+
+    if unite == unite_ratio:
+        facteur = facteur_ratio = Decimal(1)  # même unité, même non convertible (gousse, tranche...)
+    elif facteur is None or facteur_ratio is None or dimension != dimension_ratio:
+        return quantite, unite
+
+    nombre_de_ratios = (quantite * facteur) / (produit.ratioQuantite * facteur_ratio)
+    return nombre_de_ratios * produit.ratioQuantiteBase, unites_par_id.get(produit.ratioUniteBase_id)
+
+
+def _vers_produit_achete(produit, quantite, unite, unites_par_id):
+    """Ce qu'on achète réellement : "1 cs d'ail haché" -> "3 gousses d'ail" (en remontant les produits de base)."""
+    vus = set()
+    while produit.produitDeBase_id and produit.pk not in vus:
+        vus.add(produit.pk)
+        quantite, unite = _appliquer_ratio(produit, quantite, unite, unites_par_id)
+        produit = produit.produitDeBase
+    return produit, quantite, unite
+
+
 def construire_liste_course(ingredients, scaling_factor, unites_par_id):
     """
-    Agrège les ingrédients par produit (ou nom libre) et par dimension d'unité :
-    200 g + 0,5 kg de beurre -> 700 g ; 1 cs + 1 cc d'huile -> 20 ml.
+    Agrège les ingrédients par produit acheté (produit de base, ou nom libre) et par dimension d'unité :
+    200 g + 0,5 kg de beurre -> 700 g ; 1 cs + 1 cc d'huile -> 20 ml ;
+    1 cs d'ail haché + 2 gousses d'ail -> 5 gousses d'ail (ratio du produit dérivé).
     Les unités non convertibles (pincée...) ne s'additionnent qu'entre elles.
     Un même produit dans deux dimensions (2 oignons + 150 g d'oignon) reste sur deux lignes.
+    Les quantités sans unité (pièces) sont arrondies à l'unité supérieure : on n'achète pas 3,75 citrons.
     """
     groupes = {}
 
     for ingredient in ingredients:
         unite = ingredient.unite
+        quantite = ingredient.quantite * scaling_factor if ingredient.quantite is not None else None
+        produit = None
+        if ingredient.produit_id:
+            produit, quantite, unite = _vers_produit_achete(ingredient.produit, quantite, unite, unites_par_id)
+
         dimension, facteur = _unite_info(unite)
         convertible = facteur is not None
 
-        if ingredient.produit_id:
-            cle_produit = ('produit', ingredient.produit_id)
+        if produit:
+            cle_produit = ('produit', produit.pk)
         else:
             cle_produit = ('nom', (ingredient.nom or '').strip().lower())
         cle_unite = dimension if convertible else ('unite', unite.id)
 
         groupe = groupes.setdefault((cle_produit, cle_unite), {
-            'produit': ingredient.produit,
-            'nom': ingredient.nom if not ingredient.produit_id else None,
+            'produit': produit,
+            'nom': ingredient.nom if not produit else None,
             'unites': [],
+            'derives': {},  # nom du produit dérivé ("jaune d'œuf") -> quantité, en unité de base
             'quantite_base': None,  # en unité de base (g, ml, pièce, cm) ou dans l'unité elle-même si non convertible
         })
         if unite not in groupe['unites']:
             groupe['unites'].append(unite)
 
-        if ingredient.quantite is not None:
-            quantite = ingredient.quantite * scaling_factor * (facteur if convertible else 1)
+        if quantite is not None and convertible:
+            quantite = quantite * facteur
+
+        if produit and ingredient.produit_id != produit.pk:
+            derive = groupe['derives'].setdefault(ingredient.produit.nom, None)
+            if quantite is not None:
+                groupe['derives'][ingredient.produit.nom] = quantite if derive is None else derive + quantite
+        elif quantite is not None:
             groupe['quantite_base'] = quantite if groupe['quantite_base'] is None else groupe['quantite_base'] + quantite
+
+    # Dérivés différents d'un même produit = souvent les mêmes unités séparées (5 jaunes + 5 blancs = 5 œufs) :
+    # on ajoute le plus grand, pas la somme
+    for groupe in groupes.values():
+        quantites_derives = [q for q in groupe['derives'].values() if q is not None]
+        if quantites_derives:
+            groupe['quantite_base'] = (groupe['quantite_base'] or 0) + max(quantites_derives)
 
     # "sel, au goût" sans quantité n'apporte rien si le produit est déjà sur la liste avec une quantité
     produits_avec_quantite = {cle_produit for (cle_produit, _), g in groupes.items() if g['quantite_base'] is not None}
@@ -76,11 +129,17 @@ def construire_liste_course(ingredients, scaling_factor, unites_par_id):
             unite = _monter_unite(quantite, unite, unites_par_id)
             quantite = quantite / _unite_info(unite)[1]
 
+        if quantite is not None:
+            quantite = quantite.quantize(Decimal('0.01'))
+            if unite is None:
+                quantite = quantite.quantize(Decimal('1'), rounding=ROUND_CEILING)
+
         resultats.append({
             'produit': groupe['produit'],
             'nom': groupe['nom'],
+            'precision': ', '.join(sorted(groupe['derives'])) or None,
             'unite': unite,
-            'quantite': quantite.quantize(Decimal('0.01')) if quantite is not None else None,
+            'quantite': quantite,
         })
 
     resultats.sort(key=lambda x: (x['produit'].nom if x['produit'] else (x['nom'] or '')).lower())
