@@ -16,6 +16,13 @@ class RecetteSerializer(serializers.ModelSerializer):
         model = recette.models.Recette
         fields = ['id', 'titre', 'portion', 'typeRecette','image','conseil', 'adapteQuantity', 'user_id' ]
 
+    def validate_typeRecette(self, value):
+        """Le type de recette doit appartenir à l'utilisateur connecté (création comme modification)."""
+        request = self.context.get('request')
+        if request and value.user_id != request.user.id:
+            raise serializers.ValidationError("Ce type de recette ne vous appartient pas.")
+        return value
+
 class ImportRecetteSerializer(serializers.Serializer):
     recetteId = serializers.IntegerField()
     typeRecette = serializers.IntegerField()

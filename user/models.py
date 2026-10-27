@@ -1,12 +1,10 @@
 import os
 import uuid
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import BaseUserManager, AbstractUser
-from django.contrib.staticfiles.storage import staticfiles_storage
-from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
-from django.db.models.signals import post_delete, pre_save
+from gestionDeRecette.utils import register_image_cleanup
 
 # Custom Auth
 # https://docs.djangoproject.com/fr/3.2/topics/auth/customizing/#a-full-example
@@ -28,21 +26,32 @@ class UserManager(BaseUserManager):
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
-        user.save(using=self._db)
 
-        import typeRecette.models
-        typeRecette.models.TypeRecette.objects.create( user=user, noOrdre=10, type="Apéro")
-        typeRecette.models.TypeRecette.objects.create( user=user, noOrdre=20, type="Entrée")
-        typeRecette.models.TypeRecette.objects.create( user=user, noOrdre=30, type="Plat")
-        typeRecette.models.TypeRecette.objects.create( user=user, noOrdre=40, type="Dessert")
+        # atomic : pas d'utilisateur à moitié créé (sans ses types / tags) si une insertion échoue
+        with transaction.atomic(using=self._db):
+            user.save(using=self._db)
+            self._create_default_data(user)
 
-        import tag.models
-        tag.models.Tag.objects.create( user=user, tag="Poisson", red=81, green=88, blue=192, opacite=210)
-        tag.models.Tag.objects.create( user=user, tag="Végétarien",  red=105, green=170, blue=0, opacite=210)
-        tag.models.Tag.objects.create( user=user, tag="Porc",  red=255, green=47, blue=0, opacite=82)
-        tag.models.Tag.objects.create( user=user, tag="Poulet",  red=255, green=0, blue=4, opacite=255)
-        
         return user
+
+    def _create_default_data(self, user):
+        """Types de recette et tags proposés par défaut à chaque nouvel utilisateur."""
+        # imports locaux : typeRecette et tag importent user.models (import circulaire)
+        from typeRecette.models import TypeRecette
+        from tag.models import Tag
+
+        TypeRecette.objects.bulk_create([
+            TypeRecette(user=user, noOrdre=10, type="Apéro"),
+            TypeRecette(user=user, noOrdre=20, type="Entrée"),
+            TypeRecette(user=user, noOrdre=30, type="Plat"),
+            TypeRecette(user=user, noOrdre=40, type="Dessert"),
+        ])
+        Tag.objects.bulk_create([
+            Tag(user=user, tag="Poisson", red=81, green=88, blue=192, opacite=210),
+            Tag(user=user, tag="Végétarien", red=105, green=170, blue=0, opacite=210),
+            Tag(user=user, tag="Porc", red=255, green=47, blue=0, opacite=82),
+            Tag(user=user, tag="Poulet", red=255, green=0, blue=4, opacite=255),
+        ])
 
     def create_user(self, email, password=None, **extra_fields):
         """Create and save a regular User with the given email and password."""
@@ -99,25 +108,4 @@ class User(AbstractUser):
     
     avatar_preview.short_description = 'Aperçu'
 
-@receiver(post_delete, sender=User)
-def auto_delete_file_on_delete(sender, instance, **kwargs):
-    """Supprime le fichier du disque quand la recette est supprimée de la base."""
-    if instance.avatar:
-        if os.path.isfile(instance.avatar.path):
-            os.remove(instance.avatar.path)
-
-@receiver(pre_save, sender=User)
-def auto_delete_file_on_change(sender, instance, **kwargs):
-    """Supprime l'ancien fichier quand une nouvelle image est téléchargée."""
-    if not instance.pk:
-        return False
-
-    try:
-        old_file = User.objects.get(pk=instance.pk).avatar
-    except User.DoesNotExist:
-        return False
-
-    new_file = instance.avatar
-    if old_file and old_file != new_file:
-        if os.path.isfile(old_file.path):
-            os.remove(old_file.path)
+register_image_cleanup(User, 'avatar')

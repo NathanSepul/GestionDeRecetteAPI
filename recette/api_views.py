@@ -1,21 +1,26 @@
+import os
 from decimal import Decimal
-from django.db import transaction
+from django.core.files.base import ContentFile
+from django.db import IntegrityError, transaction
+from django.db.models import Max
+from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, status, generics, permissions
-from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.response import Response
 from gestionDeRecette.api_views import IsOwner
-from recette.models import *
-from recette.serializer import  *
-from django.db.models import Max
-
-import os
-from django.core.files.base import ContentFile
-from django.shortcuts import get_object_or_404
-from django.db import IntegrityError
+from gestionDeRecette.utils import reorder
+from recette.models import Recette, Ingredient, Preparation, Produit, Unite
+from recette.serializer import (
+    RecetteSerializer, ImportRecetteSerializer, ProduitSerializer, UniteSerializer,
+    IngredientSerializer, ReorderIngredientSerializer, PreparationSerializer, ReorderPreparationSerializer,
+    ListeCourseRequestSerializer, ListeCourseItemSerializer,
+)
 from typeRecette.models import TypeRecette
 
-    
+
+
 @extend_schema(tags=['Recette'])
 class RecetteViewSet(viewsets.ModelViewSet):
     queryset = Recette.objects.all()
@@ -53,14 +58,12 @@ class RecetteViewSet(viewsets.ModelViewSet):
                     pass 
 
             except ValueError:
-                from rest_framework.exceptions import ValidationError
                 raise ValidationError({"tags": "Les IDs de tags doivent être des entiers séparés par des virgules."})
         
        
         if queryparam_OrderBy:
             # liste blanche : un champ libre permettrait de trier sur user__password et d'en déduire les hashs
             if queryparam_OrderBy.lstrip('-') not in self.ORDER_BY_FIELDS:
-                from rest_framework.exceptions import ValidationError
                 raise ValidationError({"orderBy": f"Valeurs autorisées : {', '.join(self.ORDER_BY_FIELDS)} (préfixe '-' pour l'ordre décroissant)."})
             return queryset.order_by(queryparam_OrderBy)
         else:
@@ -92,37 +95,31 @@ class RecetteViewSet(viewsets.ModelViewSet):
         scaling_factor_decimal = Decimal(str(scaling_factor))
 
         if Decimal(1) != scaling_factor:
-            for ingredient in recette_instance.ingredient_set.all():
-                if ingredient.quantite is not None and not ingredient.isSection:
-                    new_quantity = ingredient.quantite * scaling_factor_decimal
-                    ingredient.quantite = new_quantity.quantize(Decimal('0.01')) # Round to 2 decimal places
-                    ingredient.save()
+            ingredients = list(recette_instance.ingredient_set.filter(isSection=False, quantite__isnull=False))
+            for ingredient in ingredients:
+                new_quantity = ingredient.quantite * scaling_factor_decimal
+                ingredient.quantite = new_quantity.quantize(Decimal('0.01')) # Round to 2 decimal places
+            Ingredient.objects.bulk_update(ingredients, ['quantite'])
     
     def update(self, request, *args, **kwargs):
-        try:    
-            with transaction.atomic():
-                instance = self.get_object()
-                old_portion = instance.portion
+        with transaction.atomic():
+            instance = self.get_object()
+            old_portion = instance.portion
 
-                data = request.data.copy()
-                adapte_val = data.pop("adapteQuantity", [False])
-                if isinstance(adapte_val, list): adapte_val = adapte_val[0]
-                should_adapt = str(adapte_val).lower() == 'true'
-                
-                serializer = self.get_serializer(instance, data=data, partial=True)
-                serializer.is_valid(raise_exception=True)
-                updated_instance = serializer.save()
-                
-                if should_adapt and old_portion and old_portion != 0:
-                    new_portion = updated_instance.portion
-                    if new_portion != old_portion:
-                        scaling_factor = new_portion / old_portion    
-                        self._adapt_ingredient_quantities(updated_instance, scaling_factor)
-                        
-                updated_instance.refresh_from_db()
-                return Response(self.get_serializer(updated_instance).data)
-        except Exception as e:
-            return Response(f"An error occurred during update recette: {e}", status=status.HTTP_400_BAD_REQUEST)
+            # pas de request.data.copy() : copier le QueryDict copie aussi l'image uploadée et plante au-delà de ~2,5 Mo
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            should_adapt = serializer.validated_data.pop('adapteQuantity', False)
+            updated_instance = serializer.save()
+
+            if should_adapt and old_portion and old_portion != 0:
+                new_portion = updated_instance.portion
+                if new_portion != old_portion:
+                    scaling_factor = new_portion / old_portion
+                    self._adapt_ingredient_quantities(updated_instance, scaling_factor)
+
+            updated_instance.refresh_from_db()
+            return Response(self.get_serializer(updated_instance).data)
    
     @action(detail=False, methods=['post'], url_path='import', serializer_class=ImportRecetteSerializer)
     def import_recette(self, request):
@@ -201,7 +198,7 @@ class RecetteViewSet(viewsets.ModelViewSet):
 
         aggregated = {}
         
-        for ingredient in recette.ingredient_set.filter(isSection=False):
+        for ingredient in recette.ingredient_set.filter(isSection=False).select_related('produit', 'unite'):
             if ingredient.quantite is not None:
                 scaled_qty = (ingredient.quantite * scaling_factor).quantize(Decimal('0.01'))
             else:
@@ -234,7 +231,8 @@ class RecetteViewSet(viewsets.ModelViewSet):
 
 @extend_schema(tags=['Ingredient'])
 class IngredientViewSet(viewsets.ModelViewSet):
-    queryset = Ingredient.objects.all()
+    # select_related : évite 2 requêtes par ingrédient pour produit_detail / unite_detail
+    queryset = Ingredient.objects.select_related('produit', 'unite')
     serializer_class = IngredientSerializer
     pagination_class = None
     permission_classes = [permissions.IsAuthenticated,IsOwner]
@@ -254,7 +252,6 @@ class IngredientViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         """Assigne automatiquement l'utilisateur lors de la création."""
-        from rest_framework.exceptions import PermissionDenied
         recette_instance = serializer.validated_data.get('recette')
 
         if recette_instance.user_id != self.request.user.id:
@@ -266,7 +263,6 @@ class IngredientViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         """Empêche de déplacer l'ingrédient vers la recette d'un autre utilisateur."""
-        from rest_framework.exceptions import PermissionDenied
         recette_instance = serializer.validated_data.get('recette')
 
         if recette_instance and recette_instance.user_id != self.request.user.id:
@@ -277,40 +273,16 @@ class IngredientViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], serializer_class=ReorderIngredientSerializer)
     def reorder(self, request, pk=None):
         """Réorganise l'ordre d'une étape spécifique."""
-        try:
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            new_position = serializer.validated_data["newPosition"]
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-            with transaction.atomic():
-                ingredient_to_move = self.get_object()
-                current_recette_id = ingredient_to_move.recette_id
+        with transaction.atomic():
+            ingredient_to_move = self.get_object()
+            siblings = Ingredient.objects.filter(recette_id=ingredient_to_move.recette_id)
+            new_ordered_list = reorder(ingredient_to_move, siblings, serializer.validated_data["newPosition"])
 
-                ingredients_to_reorder = Ingredient.objects.filter(
-                    recette_id=current_recette_id
-                ).exclude(id=ingredient_to_move.id).order_by('noOrdre')
-
-                new_ordered_list = []
-                if new_position == 0:
-                    new_ordered_list.append(ingredient_to_move)
-
-                for i, ing in enumerate(ingredients_to_reorder):
-                    new_ordered_list.append(ing)
-                    if i + 1 == new_position:
-                        new_ordered_list.append(ingredient_to_move)
-
-                for index, ing in enumerate(new_ordered_list):
-                    ing.noOrdre = index
-                    ing.save()
-                    
-            result_serializer = IngredientSerializer(new_ordered_list, many=True)
-            return Response(result_serializer.data, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response(
-                {"detail": f"Erreur : {str(e)}"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        result_serializer = IngredientSerializer(new_ordered_list, many=True)
+        return Response(result_serializer.data, status=status.HTTP_200_OK)
 
 
 ########################
@@ -339,8 +311,6 @@ class PreparationViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         """Assigne automatiquement l'utilisateur lors de la création."""
-        from rest_framework.exceptions import PermissionDenied
-
         recette_instance = serializer.validated_data.get('recette')
 
         if recette_instance.user_id != self.request.user.id:
@@ -352,7 +322,6 @@ class PreparationViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         """Empêche de déplacer la préparation vers la recette d'un autre utilisateur."""
-        from rest_framework.exceptions import PermissionDenied
         recette_instance = serializer.validated_data.get('recette')
 
         if recette_instance and recette_instance.user_id != self.request.user.id:
@@ -363,40 +332,16 @@ class PreparationViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], serializer_class=ReorderPreparationSerializer)
     def reorder(self, request, pk=None):
         """Réorganise l'ordre d'une étape spécifique."""
-        try:
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            new_position = serializer.validated_data["newPosition"]
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-            with transaction.atomic():
-                preparation_to_move = self.get_object()
-                current_recette_id = preparation_to_move.recette_id
+        with transaction.atomic():
+            preparation_to_move = self.get_object()
+            siblings = Preparation.objects.filter(recette_id=preparation_to_move.recette_id)
+            new_ordered_list = reorder(preparation_to_move, siblings, serializer.validated_data["newPosition"])
 
-                preparations_to_reorder = Preparation.objects.filter(
-                    recette_id=current_recette_id
-                ).exclude(id=preparation_to_move.id).order_by('noOrdre')
-
-                new_ordered_list = []
-                if new_position == 0:
-                    new_ordered_list.append(preparation_to_move)
-
-                for i, prep in enumerate(preparations_to_reorder):
-                    new_ordered_list.append(prep)
-                    if i + 1 == new_position:
-                        new_ordered_list.append(preparation_to_move)
-
-                for index, prep in enumerate(new_ordered_list):
-                    prep.noOrdre = index
-                    prep.save()
-                    
-            result_serializer = PreparationSerializer(new_ordered_list, many=True)
-            return Response(result_serializer.data, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response(
-                {"detail": f"Erreur : {str(e)}"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        result_serializer = PreparationSerializer(new_ordered_list, many=True)
+        return Response(result_serializer.data, status=status.HTTP_200_OK)
     
 ############
 ###########

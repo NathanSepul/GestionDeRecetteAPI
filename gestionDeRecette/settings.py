@@ -45,6 +45,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_registration',
     'rest_framework_simplejwt',
+    # requis pour que BLACKLIST_AFTER_ROTATION invalide réellement les anciens refresh tokens
+    'rest_framework_simplejwt.token_blacklist',
     'drf_spectacular',
     'corsheaders',
     'django_extensions',
@@ -277,3 +279,17 @@ SIMPLE_JWT = {
 
 
 
+
+
+# Sans config, Django n'écrit pas les erreurs 500 dans la console quand DEBUG=False (gunicorn les récupère via stderr)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler'},
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+}

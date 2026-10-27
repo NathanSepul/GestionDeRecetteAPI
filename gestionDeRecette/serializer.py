@@ -12,7 +12,7 @@ class MyPagination(pagination.PageNumberPagination):
             'next': self.page.has_next(),
             'previous': self.page.has_previous(),
             'current': self.page.number,
-            'count': len(data) - 1,
+            'count': len(data),
             'nbrTotalResult': self.page.paginator.count,
             'results': data
         })

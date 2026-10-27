@@ -3,11 +3,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Count, Max
 from gestionDeRecette.api_views import IsOwner
+from gestionDeRecette.utils import reorder
 from typeRecette.models import TypeRecette
 from typeRecette.serializer import TypeRecetteSerializer, ReorderTypeRecetteSerializer
-from django.db.models import Count
 
 @extend_schema(tags=['Type de recette'])
 class TypeRecetteViewSet(viewsets.ModelViewSet):
@@ -38,31 +38,14 @@ class TypeRecetteViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], serializer_class=ReorderTypeRecetteSerializer)
     def reorder(self, request, pk=None):
         """Triage de l'ordre des types de recettes."""
-        try:
-            serializer = self.serializer_class(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            new_position = serializer.validated_data["newPosition"]
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-            with transaction.atomic():
-                type_to_move = self.get_object()
-                type_to_reorder = TypeRecette.objects.filter(user_id=self.request.user.id).exclude(id=type_to_move.id).order_by('noOrdre')
+        with transaction.atomic():
+            type_to_move = self.get_object()
+            # annotate : TypeRecetteSerializer lit recipe_count sur chaque type renvoyé
+            siblings = TypeRecette.objects.filter(user_id=self.request.user.id).annotate(recipe_count=Count('recette'))
+            new_ordered_list = reorder(type_to_move, siblings, serializer.validated_data["newPosition"])
 
-                new_ordered_list = []
-
-                if new_position == 0:
-                    new_ordered_list.append(type_to_move)
-
-                for i, type in enumerate(type_to_reorder):
-                    new_ordered_list.append(type)
-                    if i + 1 == new_position:
-                        new_ordered_list.append(type_to_move)
-
-                for index, type in enumerate(new_ordered_list):
-                    type.noOrdre = index
-                    type.save()
-                    
-            serializer =  TypeRecetteSerializer(new_ordered_list, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response({"detail": f"Une erreur s'est produite lors de la réorganisation : {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
+        serializer = TypeRecetteSerializer(new_ordered_list, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
