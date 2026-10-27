@@ -2,7 +2,7 @@ import os
 from decimal import Decimal
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from django.db.models import Max
+from django.db.models import Case, IntegerField, Max, When
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, status, generics, permissions
@@ -11,6 +11,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from gestionDeRecette.api_views import IsOwner
 from gestionDeRecette.utils import reorder
+from recette.liste_course import construire_liste_course
 from recette.models import Recette, Ingredient, Preparation, Produit, Unite
 from recette.serializer import (
     RecetteSerializer, ImportRecetteSerializer, ProduitSerializer, UniteSerializer,
@@ -196,33 +197,13 @@ class RecetteViewSet(viewsets.ModelViewSet):
             if recette.portion else Decimal(1)
         )
 
-        aggregated = {}
-        
-        for ingredient in recette.ingredient_set.filter(isSection=False).select_related('produit', 'unite'):
-            if ingredient.quantite is not None:
-                scaled_qty = (ingredient.quantite * scaling_factor).quantize(Decimal('0.01'))
-            else:
-                scaled_qty = None  # ex: "sel, au goût" -> pas de quantité à sommer
+        # toutes les unités en mémoire (une dizaine) : évite une requête par unité supérieure
+        unites_par_id = {unite.id: unite for unite in Unite.objects.all()}
+        ingredients = recette.ingredient_set.filter(isSection=False).select_related('produit')
+        for ingredient in ingredients:
+            ingredient.unite = unites_par_id.get(ingredient.unite_id)
 
-            if ingredient.produit_id:
-                key = ('produit', ingredient.produit_id, ingredient.unite_id)
-            else:
-                key = ('nom', ingredient.nom, ingredient.unite_id)
-
-            if key not in aggregated:
-                aggregated[key] = {
-                    'produit': ingredient.produit,
-                    'nom': ingredient.nom if not ingredient.produit_id else None,
-                    'unite': ingredient.unite,
-                    'quantite': None,
-                }
-
-            if scaled_qty is not None:
-                current = aggregated[key]['quantite']
-                aggregated[key]['quantite'] = scaled_qty if current is None else current + scaled_qty
-
-        results = list(aggregated.values())
-        results.sort(key=lambda x: (x['produit'].nom if x['produit'] else (x['nom'] or '')).lower())
+        results = construire_liste_course(ingredients, scaling_factor, unites_par_id)
 
         result_serializer = ListeCourseItemSerializer(results, many=True)
         return Response(result_serializer.data, status=status.HTTP_200_OK)
@@ -360,10 +341,20 @@ class ProduitListAPIView(generics.ListAPIView):
         queryset = super().get_queryset()
         queryparam_produit = self.request.GET.get('searchProduit', '')
         
-        if queryparam_produit:
-            queryset = queryset.filter(nom__icontains=queryparam_produit)
-        
-        return queryset.order_by('nom')
+        if not queryparam_produit:
+            return queryset.order_by('nom')
+
+        # Les produits qui commencent par la recherche avant ceux qui la contiennent ailleurs
+        queryset = queryset.filter(nom__icontains=queryparam_produit).annotate(
+            pertinence=Case(When(nom__istartswith=queryparam_produit, then=0), default=1, output_field=IntegerField())
+        ).order_by('pertinence', 'nom')
+
+        # Limite optionnelle (?limit=) : sans paramètre, tous les résultats (comportement attendu par l'app Flutter)
+        try:
+            limit = int(self.request.GET.get('limit', 0))
+        except ValueError:
+            limit = 0
+        return queryset[:limit] if limit > 0 else queryset
     
 
 ############

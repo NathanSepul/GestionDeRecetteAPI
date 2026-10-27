@@ -42,7 +42,7 @@ class ProduitSerializer(serializers.ModelSerializer):
 class UniteSerializer(serializers.ModelSerializer):
     class Meta:
         model = recette.models.Unite
-        fields = ['id', 'code', 'description']#, 'borneSuperieur', 'uniteSuperieur_id' ] 
+        fields = ['id', 'code', 'pluriel', 'description']#, 'borneSuperieur', 'uniteSuperieur_id' ]
 
 
 # 
@@ -97,6 +97,7 @@ class ListeCourseRequestSerializer(serializers.Serializer):
 
 class ListeCourseItemSerializer(serializers.Serializer):
     produit = ProduitSerializer(allow_null=True)
+    nom = serializers.CharField(allow_null=True)  # ingrédient sans produit lié : le front affiche ce nom
     unite = UniteSerializer(allow_null=True)
     quantite = serializers.DecimalField(max_digits=9, decimal_places=2, allow_null=True)
     

@@ -12,7 +12,8 @@ class ProduitAdmin(admin.ModelAdmin):
 
 @admin.register(recette.models.Unite)
 class UniteAdmin(admin.ModelAdmin):
-    list_display = ('id','code','description')
+    list_display = ('id','code','pluriel','description', 'dimension', 'facteur', 'uniteSuperieur', 'borneSuperieur')
+    list_filter = ('dimension',)
     readonly_fields =[ 'id',]
     list_per_page = 20
     search_fields = ('code',)

@@ -7,5 +7,6 @@
 *.pot
 *.pyc
 **/__pycache__/
-media.DS_Store
+media/
+.DS_Store
 staticfiles/

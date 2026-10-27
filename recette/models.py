@@ -60,8 +60,20 @@ class Produit(models.Model):
         return self.nom
 
 class Unite(models.Model):
-    code = models.CharField(max_length=5)
+    class Dimension(models.TextChoices):
+        MASSE = 'masse', _("Masse (base : g)")
+        VOLUME = 'volume', _("Volume (base : ml)")
+        PIECE = 'piece', _("Pièce")
+        LONGUEUR = 'longueur', _("Longueur (base : cm)")
+        VAGUE = 'vague', _("Non convertible (pincée...)")
+
+    code = models.CharField(max_length=10)
+    pluriel = models.CharField(max_length=15, blank=True, default='')  # "gousses" ; vide si identique au code (g, ml...)
     description = models.TextField()
+    # dimension + facteur (vers l'unité de base de la dimension) permettent d'additionner 200 g et 0,5 kg
+    dimension = models.CharField(max_length=10, choices=Dimension.choices, default=Dimension.VAGUE)
+    facteur = models.DecimalField(max_digits=12, decimal_places=4, blank=True, null=True)
+    # borne / unité supérieure : quand passer à l'unité d'affichage suivante (1000 g -> kg)
     borneSuperieur = models.IntegerField(blank=True, null=True)
     uniteSuperieur = models.ForeignKey(
         'self', on_delete=models.PROTECT,
@@ -80,13 +92,24 @@ class Unite(models.Model):
                 ),
                 name="unite_borne_et_unite_superieure_ensemble",
             ),
+            models.CheckConstraint(
+                condition=Q(dimension='vague') | Q(facteur__isnull=False),
+                name="unite_facteur_obligatoire_si_convertible",
+            ),
         ]
-        
+
+    def __str__(self):
+        return self.code
+
     def clean(self):
         super().clean()
         if self.pk and self.uniteSuperieur_id == self.pk:
             raise ValidationError(
                 {"uniteSuperieur": _("Une unité ne peut pas être sa propre unité supérieure.")}
+            )
+        if self.uniteSuperieur and self.uniteSuperieur.dimension != self.dimension:
+            raise ValidationError(
+                {"uniteSuperieur": _("L'unité supérieure doit avoir la même dimension.")}
             )
 
 
