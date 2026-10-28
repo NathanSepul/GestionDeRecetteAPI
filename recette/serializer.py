@@ -17,7 +17,8 @@ class RecetteSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = recette.models.Recette
-        fields = ['id', 'titre', 'portion', 'typeRecette','image', 'imageThumb', 'imageMedium', 'conseil', 'adapteQuantity', 'user_id' ]
+        fields = ['id', 'titre', 'portion', 'typeRecette','image', 'imageThumb', 'imageMedium', 'conseil', 'source', 'adapteQuantity', 'user_id' ]
+        read_only_fields = ['source']
 
     def validate_typeRecette(self, value):
         """Le type de recette doit appartenir à l'utilisateur connecté (création comme modification)."""
@@ -29,6 +30,11 @@ class RecetteSerializer(serializers.ModelSerializer):
 class ImportRecetteSerializer(serializers.Serializer):
     recetteId = serializers.IntegerField()
     typeRecette = serializers.IntegerField()
+
+class ImportUrlSerializer(serializers.Serializer):
+    url = serializers.URLField(max_length=500)
+    typeRecette = serializers.IntegerField()
+    importerImage = serializers.BooleanField(default=True)
 # 
 # ----------------------------------
 # ----------------------------------

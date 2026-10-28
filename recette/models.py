@@ -24,6 +24,8 @@ class Recette(models.Model):
     typeRecette = models.ForeignKey(TypeRecette, on_delete=models.CASCADE, verbose_name=_("Type de recette"))
     image = models.ImageField(upload_to=path_and_rename, blank=True, null=True,)
     conseil = models.TextField(blank=True, null=True)
+    # page d'origine d'une recette importée (Marmiton...) : on cite toujours la source
+    source = models.URLField(max_length=500, blank=True, null=True)
 
     class Meta:
         db_table = 'recette'

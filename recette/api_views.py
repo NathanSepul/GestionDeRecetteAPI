@@ -11,10 +11,11 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from gestionDeRecette.api_views import IsOwner
 from gestionDeRecette.utils import reorder
+from recette.import_web import ImportRecetteErreur, importer_recette_depuis_url
 from recette.liste_course import generer_liste_course
 from recette.models import Recette, Ingredient, Preparation, Produit, Unite
 from recette.serializer import (
-    RecetteSerializer, ImportRecetteSerializer, ProduitSerializer, UniteSerializer,
+    RecetteSerializer, ImportRecetteSerializer, ImportUrlSerializer, ProduitSerializer, UniteSerializer,
     IngredientSerializer, ReorderIngredientSerializer, PreparationSerializer, ReorderPreparationSerializer,
     ListeCourseRequestSerializer, ListeCourseItemSerializer,
 )
@@ -144,6 +145,7 @@ class RecetteViewSet(viewsets.ModelViewSet):
                     portion=source_recette.portion,
                     typeRecette=type_recette,
                     conseil=source_recette.conseil,
+                    source=source_recette.source,
                 )
 
                 # Copie de l'image (nouveau fichier physique, pas juste une référence)
@@ -184,6 +186,23 @@ class RecetteViewSet(viewsets.ModelViewSet):
         result_serializer = RecetteSerializer(new_recette)
         return Response(result_serializer.data, status=status.HTTP_201_CREATED)
     
+    @action(detail=False, methods=['post'], url_path='import-url', serializer_class=ImportUrlSerializer)
+    def import_url(self, request):
+        """Importe une recette depuis un site de cuisine (Marmiton...) dans un type de l'utilisateur."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        type_recette = get_object_or_404(TypeRecette, pk=serializer.validated_data['typeRecette'], user=request.user)
+
+        try:
+            recette = importer_recette_depuis_url(
+                serializer.validated_data['url'], request.user, type_recette,
+                importer_image=serializer.validated_data['importerImage'],
+            )
+        except ImportRecetteErreur as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(RecetteSerializer(recette, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
     @action(detail=False, methods=['post'], url_path='liste-course', serializer_class=ListeCourseRequestSerializer)
     def liste_course(self, request):
         """Génère la liste de course agrégée (par produit) pour une recette et un nombre de portions donné."""
