@@ -378,4 +378,5 @@ class UniteListAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        return queryset.order_by('code')
+        # "pièce" ne sert que d'unité d'achat : sur un ingrédient, "sans unité" veut déjà dire pièces
+        return queryset.exclude(code='pièce').order_by('code')

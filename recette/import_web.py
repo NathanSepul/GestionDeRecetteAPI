@@ -252,6 +252,11 @@ FRACTIONS = {'½': ' 1/2', '¼': ' 1/4', '¾': ' 3/4', '⅓': ' 1/3', '⅔': ' 2
 # "1", "1,5", "0.5", "1 1/2", "1/2", suivi éventuellement d'une fourchette "2-3" / "2 à 3" (on garde la première valeur)
 RE_QUANTITE = re.compile(r'^(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)(?:\s*(?:-|a)\s*\d+(?:[.,]\d+)?)?\s*')
 RE_ARTICLE = re.compile(r"^(?:de la |de l'|des |du |de |d')")
+# préparation en fin de ligne (texte normalisé) : "oignons emincés" -> produit "oignon" + préparation "émincés"
+RE_PREPARATION = re.compile(
+    r"(?:,\s*|\s)((?:hache|emince|rape|cisele|pele|presse|epluche|trempe|ramolli|fondu|coupe)(?:e|s|es)?"
+    r"(?: finement| en des| en rondelles| en lamelles| en morceaux)?|mous?|molles?|en des|en rondelles|en lamelles)$"
+)
 
 
 def _quantite(texte):
@@ -280,7 +285,8 @@ class AnalyseurIngredients:
 
     def __init__(self):
         self.unites = {}  # alias normalisé -> Unite
-        for unite in Unite.objects.all():
+        # "pièce" ne sert que d'unité d'achat : sur un ingrédient, "sans unité" veut déjà dire pièces
+        for unite in Unite.objects.exclude(code='pièce'):
             alias = {normaliser(v) for v in (unite.code, unite.pluriel, unite.description) if v}
             for groupe in SYNONYMES_UNITES:
                 if alias & set(groupe):
@@ -314,8 +320,9 @@ class AnalyseurIngredients:
         return None
 
     def analyser(self, ligne):
-        """'200 g de farine'  -> (Decimal('200.00'), <Unite g>, <Produit farine>, None)
-        '1 l de lait de coco' -> (Decimal('1.00'), <Unite l>, None, 'lait de coco')
+        """'200 g de farine'  -> (Decimal('200.00'), <Unite g>, <Produit farine>, None, '')
+        '2 oignons émincés'   -> (Decimal('2.00'), None, <Produit oignon>, None, 'émincés')
+        '1 l de lait de coco' -> (Decimal('1.00'), <Unite l>, None, 'lait de coco', '')
         Sans produit reconnu, le nom (tel qu'écrit sur le site) est gardé : l'utilisateur l'associera en relisant."""
         quantite, reste = _quantite(normaliser(ligne))
         unite = None
@@ -327,8 +334,16 @@ class AnalyseurIngredients:
         nom = ' '.join(ligne.split()[-nb_mots:]) if nb_mots else ''
         nom = RE_ARTICLE.sub('', nom, count=1) if RE_ARTICLE.match(normaliser(nom)) else nom
 
-        produit = self._produit(RE_ARTICLE.sub('', reste).strip())
-        return quantite, unite, produit, (None if produit else (nom or ligne)[:500])
+        texte_produit = RE_ARTICLE.sub('', reste).strip()
+        produit, preparation = self._produit(texte_produit), ''
+        if produit is None:
+            # "oignons émincés", "beurre, fondu" : le produit sans sa préparation
+            trouve = RE_PREPARATION.search(texte_produit)
+            produit = self._produit(texte_produit[:trouve.start()].rstrip(' ,')) if trouve else None
+            if produit:
+                nb_mots_preparation = len(trouve.group(1).split())
+                preparation = ' '.join(ligne.split()[-nb_mots_preparation:]).strip(' ,')[:50]
+        return quantite, unite, produit, (None if produit else (nom or ligne)[:500]), preparation
 
 
 # ---------- Création ----------
@@ -384,10 +399,10 @@ def importer_recette_depuis_url(url, user, type_recette, importer_image=True):
 
         ingredients = []
         for i, ligne in enumerate(donnees['ingredients']):
-            quantite, unite, produit, nom = analyseur.analyser(ligne)
+            quantite, unite, produit, nom, preparation = analyseur.analyser(ligne)
             ingredients.append(Ingredient(
                 recette=recette, noOrdre=i, isSection=False,
-                quantite=quantite, unite=unite, produit=produit, nom=nom,
+                quantite=quantite, unite=unite, produit=produit, nom=nom, preparation=preparation,
             ))
         Ingredient.objects.bulk_create(ingredients)
 

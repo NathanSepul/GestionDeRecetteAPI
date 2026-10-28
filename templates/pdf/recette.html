@@ -235,7 +235,7 @@
 				<span class="ingredient-quantite">
 					{% if ingredient.quantite %}{{ ingredient.quantite|floatformat:"-2" }}{% endif %} {% if ingredient.unite %} {{ ingredient.unite.code|default:"" }}{% endif %}
 				</span>
-				<span class="ingredient-nom">{{ ingredient.produit.nom|default:"" }}</span>
+				<span class="ingredient-nom">{{ ingredient.produit.nom|default:"" }}{% if ingredient.preparation %}, {{ ingredient.preparation }}{% endif %}</span>
 			</li>
 			{% endif %} {% endfor %}
 		</ul>

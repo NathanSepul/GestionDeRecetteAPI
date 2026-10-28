@@ -63,8 +63,8 @@ class IngredientSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = recette.models.Ingredient
-        fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette','unite', 'produit','unite_detail', 'produit_detail']
-    
+        fields = ['id', 'noOrdre', 'isSection', 'quantite', 'nom', 'recette','unite', 'produit', 'preparation', 'unite_detail', 'produit_detail']
+
 
 class ReorderIngredientSerializer(serializers.Serializer):
     newPosition = serializers.IntegerField(min_value=0)

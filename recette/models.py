@@ -76,6 +76,12 @@ class Produit(models.Model):
     ratioUniteBase = models.ForeignKey('Unite', on_delete=models.PROTECT, verbose_name=_("Unité de base"), blank=True, null=True, related_name='+')
     ratioQuantite = models.DecimalField(_("= quantité de ce produit"), max_digits=9, decimal_places=2, blank=True, null=True)
     ratioUnite = models.ForeignKey('Unite', on_delete=models.PROTECT, verbose_name=_("Unité de ce produit"), blank=True, null=True, related_name='+')
+    # propriétés physiques : convertir volume <-> poids <-> pièces ("1 cs de sucre" -> 15 g, "1 oignon" -> 150 g)
+    densite = models.DecimalField(_("Densité (g/ml)"), max_digits=7, decimal_places=3, blank=True, null=True)
+    poidsPiece = models.DecimalField(_("Poids d'une pièce (g)"), max_digits=9, decimal_places=2, blank=True, null=True)
+    # unité dans laquelle la liste de courses exprime le total : g (poids), ml (volume), pièce, gousse...
+    # Vide : pas de conversion entre familles d'unités, chaque famille reste sur sa ligne.
+    uniteAchat = models.ForeignKey('Unite', on_delete=models.PROTECT, verbose_name=_("Unité d'achat"), blank=True, null=True, related_name='+')
 
     class Meta:
         db_table = 'produit'
@@ -116,7 +122,8 @@ class Unite(models.Model):
         VOLUME = 'volume', _("Volume (base : ml)")
         PIECE = 'piece', _("Pièce")
         LONGUEUR = 'longueur', _("Longueur (base : cm)")
-        VAGUE = 'vague', _("Non convertible (pincée...)")
+        # gousse, botte, tranche... : leur valeur dépend du produit (ProduitMesure)
+        VAGUE = 'vague', _("Mesure propre au produit (gousse, botte...)")
 
     code = models.CharField(max_length=10)
     pluriel = models.CharField(max_length=15, blank=True, default='')  # "gousses" ; vide si identique au code (g, ml...)
@@ -164,6 +171,25 @@ class Unite(models.Model):
             )
 
 
+class ProduitMesure(models.Model):
+    """Valeur d'une mesure propre au produit : "ail · 1 gousse = 5 g", "poireau · 1 botte = 3 (pièces)"."""
+    produit = models.ForeignKey(Produit, on_delete=models.CASCADE, related_name='mesures')
+    unite = models.ForeignKey(Unite, on_delete=models.PROTECT, related_name='+', limit_choices_to={'dimension': 'vague'})
+    quantite = models.DecimalField(max_digits=9, decimal_places=2)
+    # unité de la quantité ci-dessus (g, ml, cm...) ; vide = pièces
+    uniteReference = models.ForeignKey(Unite, on_delete=models.PROTECT, related_name='+', blank=True, null=True,
+                                       limit_choices_to=~Q(dimension='vague'))
+
+    class Meta:
+        db_table = 'produit_mesure'
+        verbose_name = "mesure du produit"
+        verbose_name_plural = "mesures du produit"
+        constraints = [models.UniqueConstraint(fields=['produit', 'unite'], name='UniciteMesureParProduit')]
+
+    def __str__(self):
+        return f"1 {self.unite} de {self.produit} = {self.quantite.normalize():f} {self.uniteReference or 'pièce(s)'}"
+
+
 class Ingredient(models.Model):
     recette = models.ForeignKey(Recette,on_delete= models.CASCADE, verbose_name=_("Recette"))
     noOrdre = models.IntegerField()  
@@ -172,6 +198,8 @@ class Ingredient(models.Model):
     nom = models.TextField(blank=True,null=True)
     unite  = models.ForeignKey(Unite, on_delete=models.PROTECT, blank=True, null=True)
     produit = models.ForeignKey(Produit, on_delete=models.PROTECT, blank=True, null=True)
+    # "haché", "émincé", "fondu"... : même produit acheté, préparé autrement
+    preparation = models.CharField(max_length=50, blank=True, default='')
 
     class Meta:
         db_table = 'ingredient'

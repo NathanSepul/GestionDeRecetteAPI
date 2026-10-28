@@ -11,8 +11,13 @@ def _unite_info(unite):
 
 
 def _unite_affichage(unites_utilisees):
-    """La plus petite unité utilisée dans le groupe : on part de là, puis on monte si la quantité le justifie."""
-    return min(unites_utilisees, key=lambda u: (_unite_info(u)[1], u is not None))
+    """
+    La plus petite unité utilisée dans le groupe : on part de là, puis on monte si la quantité le justifie.
+    Les unités plus petites que l'unité de base (pincée ≈ 0,5 ml) ne servent que si elles sont seules :
+    1 pincée + 1 cc de cannelle -> "1,1 cc", pas "11 pincées".
+    """
+    unites = [u for u in unites_utilisees if (_unite_info(u)[1] or 1) >= 1] or unites_utilisees
+    return min(unites, key=lambda u: (_unite_info(u)[1], u is not None))
 
 
 def _monter_unite(quantite_base, unite, unites_par_id):
@@ -49,7 +54,7 @@ def _appliquer_ratio(produit, quantite, unite, unites_par_id):
 
 
 def _vers_produit_achete(produit, quantite, unite, unites_par_id):
-    """Ce qu'on achète réellement : "1 cs d'ail haché" -> "3 gousses d'ail" (en remontant les produits de base)."""
+    """Ce qu'on achète réellement : "4 cl de jus de citron" -> "1 citron" (en remontant les produits de base)."""
     vus = set()
     while produit.produitDeBase_id and produit.pk not in vus:
         vus.add(produit.pk)
@@ -58,12 +63,73 @@ def _vers_produit_achete(produit, quantite, unite, unites_par_id):
     return produit, quantite, unite
 
 
+def _en_grammes(produit, quantite, unite):
+    """Poids d'une quantité du produit, grâce à sa densité ou au poids d'une pièce ; None si on ne sait pas."""
+    dimension, facteur = _unite_info(unite)
+    if dimension == 'masse':
+        return quantite * facteur
+    if dimension == 'volume' and produit.densite:
+        return quantite * facteur * produit.densite
+    if dimension == PIECE and produit.poidsPiece:
+        return quantite * facteur * produit.poidsPiece
+    return None
+
+
+def _depuis_grammes(produit, grammes, cible, mesures):
+    """Exprime un poids dans l'unité cible (g, ml, pièce, gousse...) ; (None, None) si on ne sait pas."""
+    dimension, facteur = _unite_info(cible)
+    if dimension == 'masse':
+        return grammes / facteur, cible
+    if dimension == 'volume' and produit.densite:
+        return grammes / produit.densite / facteur, cible
+    if dimension == PIECE and produit.poidsPiece:
+        return grammes / produit.poidsPiece, None
+    mesure = mesures.get((produit.pk, cible.pk)) if dimension == 'vague' else None
+    if mesure:
+        grammes_par_mesure = _en_grammes(produit, mesure.quantite, mesure.unite_reference)
+        if grammes_par_mesure:
+            return grammes / grammes_par_mesure, cible
+    return None, None
+
+
+def _vers_unite_achat(produit, quantite, unite, unites_par_id, mesures):
+    """
+    Exprime la quantité dans l'unité d'achat du produit : "1 cs de sucre" -> 15 g, "150 g d'oignon" -> 1 (pièce),
+    "10 g d'ail" -> 2 gousses. Sans unité d'achat, ou sans conversion possible : quantité inchangée.
+    """
+    # mesure propre au produit ("1 gousse d'ail = 5 g") : on passe d'abord dans son unité de référence
+    mesure = mesures.get((produit.pk, unite.pk)) if unite is not None and unite.dimension == 'vague' else None
+    if mesure and quantite is not None:
+        quantite, unite = quantite * mesure.quantite, mesure.unite_reference
+
+    cible = unites_par_id.get(produit.uniteAchat_id)
+    if cible is None:
+        return quantite, unite
+    unite_cible = None if cible.dimension == PIECE else cible  # "pièce" : affichée sans unité ("3 oignons")
+    if quantite is None:
+        return None, unite_cible
+    if unite == unite_cible:
+        return quantite, unite
+
+    dimension, facteur = _unite_info(unite)
+    dimension_cible, facteur_cible = _unite_info(cible)
+    if dimension == dimension_cible and facteur and facteur_cible:
+        return quantite * facteur / facteur_cible, unite_cible
+
+    grammes = _en_grammes(produit, quantite, unite)
+    if grammes is not None:
+        quantite_cible, unite_convertie = _depuis_grammes(produit, grammes, cible, mesures)
+        if quantite_cible is not None:
+            return quantite_cible, unite_convertie
+    return quantite, unite
+
+
 def generer_liste_course(portions_par_recette):
     """
     Liste de courses de plusieurs recettes : {recette: nombre de portions voulu} -> lignes agrégées.
     Charge en une fois unités et rayons (une dizaine chacun) pour éviter une requête par ligne.
     """
-    from recette.models import Ingredient, Rayon, Unite
+    from recette.models import Ingredient, ProduitMesure, Rayon, Unite
 
     facteurs_par_recette = {
         recette.id: (Decimal(portion) / Decimal(recette.portion)) if recette.portion else Decimal(1)
@@ -71,6 +137,10 @@ def generer_liste_course(portions_par_recette):
     }
     unites_par_id = {unite.id: unite for unite in Unite.objects.all()}
     rayons_par_id = {rayon.id: rayon for rayon in Rayon.objects.all()}
+    mesures = {}
+    for mesure in ProduitMesure.objects.all():
+        mesure.unite_reference = unites_par_id.get(mesure.uniteReference_id)
+        mesures[(mesure.produit_id, mesure.unite_id)] = mesure
 
     ingredients = Ingredient.objects.filter(
         recette_id__in=facteurs_par_recette, isSection=False,
@@ -78,20 +148,20 @@ def generer_liste_course(portions_par_recette):
     for ingredient in ingredients:
         ingredient.unite = unites_par_id.get(ingredient.unite_id)
 
-    return construire_liste_course(ingredients, facteurs_par_recette, unites_par_id, rayons_par_id)
+    return construire_liste_course(ingredients, facteurs_par_recette, unites_par_id, rayons_par_id, mesures)
 
 
-def construire_liste_course(ingredients, facteurs_par_recette, unites_par_id, rayons_par_id=None):
+def construire_liste_course(ingredients, facteurs_par_recette, unites_par_id, rayons_par_id=None, mesures=None):
     """
-    Agrège les ingrédients par produit acheté (produit de base, ou nom libre) et par dimension d'unité :
-    200 g + 0,5 kg de beurre -> 700 g ; 1 cs + 1 cc d'huile -> 20 ml ;
-    1 cs d'ail haché + 2 gousses d'ail -> 5 gousses d'ail (ratio du produit dérivé).
-    Les unités non convertibles (pincée...) ne s'additionnent qu'entre elles.
-    Un même produit dans deux dimensions (2 oignons + 150 g d'oignon) reste sur deux lignes.
-    Les quantités sans unité (pièces) sont arrondies à l'unité supérieure : on n'achète pas 3,75 citrons.
+    Agrège les ingrédients par produit acheté (produit de base, ou nom libre), exprimés dans l'unité d'achat du produit :
+    200 g + 0,5 kg de beurre -> 700 g ; 6 cs + 225 g de sucre -> 315 g ; 2 oignons + 150 g d'oignon -> 3 oignons ;
+    4 cl de jus de citron -> 1 citron (ratio du produit dérivé).
+    Sans unité d'achat ou sans conversion connue, chaque famille d'unités reste sur sa ligne.
+    Les pièces et mesures (gousse, botte...) sont arrondies au-dessus : on n'achète pas 3,75 citrons.
     Tri : par rayon (ordre de parcours), produits sans rayon ensuite, produits "placard" en dernier.
     """
     rayons_par_id = rayons_par_id or {}
+    mesures = mesures or {}
     groupes = {}
 
     for ingredient in ingredients:
@@ -101,6 +171,7 @@ def construire_liste_course(ingredients, facteurs_par_recette, unites_par_id, ra
         produit = None
         if ingredient.produit_id:
             produit, quantite, unite = _vers_produit_achete(ingredient.produit, quantite, unite, unites_par_id)
+            quantite, unite = _vers_unite_achat(produit, quantite, unite, unites_par_id, mesures)
 
         dimension, facteur = _unite_info(unite)
         convertible = facteur is not None
@@ -157,7 +228,7 @@ def construire_liste_course(ingredients, facteurs_par_recette, unites_par_id, ra
 
         if quantite is not None:
             quantite = quantite.quantize(Decimal('0.01'))
-            if unite is None:
+            if unite is None or unite.dimension == 'vague':
                 quantite = quantite.quantize(Decimal('1'), rounding=ROUND_CEILING)
 
         produit = groupe['produit']
