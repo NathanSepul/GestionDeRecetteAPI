@@ -72,6 +72,9 @@ CSRF_USE_SESSIONS = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_TRUSTED_ORIGINS =  ['https://sepul.be', 'https://www.sepul.be']
 
+# Le client web (fetch credentials: "include") envoie le cookie HttpOnly du refresh token
+CORS_ALLOW_CREDENTIALS = True
+
 if DEBUG :
     CORS_ALLOW_ALL_ORIGINS = True
 else :

@@ -1,5 +1,5 @@
 from .admin import admin
-from gestionDeRecette.api_views import MyLogin, MyTokenRefreshView, MyTokenVerifyView, serve_image
+from gestionDeRecette.api_views import MyLogin, MyTokenRefreshView, MyTokenVerifyView, logout, serve_image
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include, re_path
@@ -16,6 +16,7 @@ api_urlpattern = [
     path("api/login/", MyLogin.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", MyTokenRefreshView.as_view(), name="token_refresh"),
     path("api/token/verify/", MyTokenVerifyView.as_view(), name="token_verify"),
+    path("api/token/logout/", logout, name="token_logout"),
     
     path('api/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
