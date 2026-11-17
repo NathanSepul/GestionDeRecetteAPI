@@ -59,3 +59,32 @@ class RefreshCookieTests(TestCase):
         self.client.cookies[REFRESH_COOKIE] = old
         res = self.client.post('/api/token/refresh/', {'refresh_cookie': True}, format='json')
         self.assertEqual(res.status_code, 401)
+
+
+class CreationDeCompteTests(TestCase):
+    """Pas d'inscription libre : comptes créés dans l'admin, mot de passe choisi via « mot de passe oublié »."""
+
+    def test_inscription_libre_desactivee(self):
+        client = APIClient()
+        res = client.post('/api/user/registration/register/', {'email': 'x@example.com', 'password': 'motdepasse123'}, format='json')
+        self.assertEqual(res.status_code, 404)
+        self.assertFalse(user.models.User.objects.filter(email='x@example.com').exists())
+        self.assertEqual(client.post('/api/user/registration/verify-registration/', {}, format='json').status_code, 404)
+
+    def test_creation_admin_sans_mot_de_passe_puis_lien_de_reinitialisation(self):
+        from django.core import mail
+        admin = user.models.User.objects.create_superuser(email='admin@example.com', password='motdepasse123')
+        self.client.force_login(admin)
+        res = self.client.post('/admin/user/user/add/', {
+            'email': 'mamie@example.com', 'first_name': 'Mamie', 'last_name': 'Sepul', 'language': 'fr',
+            'usable_password': 'false',
+        })
+        self.assertEqual(res.status_code, 302, res.content.decode()[:2000])
+        mamie = user.models.User.objects.get(email='mamie@example.com')
+        self.assertTrue(mamie.is_active)
+        self.assertFalse(mamie.has_usable_password())
+
+        res = APIClient().post('/api/user/registration/send-reset-password-link/', {'login': 'mamie@example.com'}, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('reset-password-form', mail.outbox[0].body)

@@ -39,6 +39,11 @@ class ImportUrlSerializer(serializers.Serializer):
     url = serializers.URLField(max_length=500)
     typeRecette = serializers.IntegerField()
     importerImage = serializers.BooleanField(default=True)
+
+class ImportSiteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = recette.models.SiteImport
+        fields = ['nom', 'domaine', 'url']
 # 
 # ----------------------------------
 # ----------------------------------

@@ -8,7 +8,7 @@ Les ingrédients arrivent en texte libre ("200 g de farine") : on en déduit qua
 Un produit introuvable (ou trouvé seulement en partie) garde le texte d'origine dans `nom`,
 pour que l'utilisateur choisisse le bon produit en relisant la recette.
 
-Sécurité : seules les pages des sites listés dans DOMAINES_AUTORISES sont téléchargées (redirections comprises),
+Sécurité : seules les pages des sites actifs de SiteImport (admin) sont téléchargées (redirections comprises),
 sinon n'importe qui pourrait faire appeler au serveur une adresse interne (SSRF).
 """
 import html
@@ -20,31 +20,21 @@ import socket
 import unicodedata
 import urllib.request
 from decimal import Decimal, InvalidOperation
+from html.parser import HTMLParser
 from io import BytesIO
 from urllib.parse import urlparse
 
-from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
 from PIL import Image
 
-from recette.models import DUREE_MAX_MINUTES, Ingredient, Preparation, Produit, Recette, Unite
+from recette.models import DUREE_MAX_MINUTES, Ingredient, Preparation, Produit, Recette, SiteImport, Unite
 
 logger = logging.getLogger(__name__)
 
-# Surchargeable dans settings.py : IMPORT_RECETTE_DOMAINES = [...]
-DOMAINES_AUTORISES = getattr(settings, 'IMPORT_RECETTE_DOMAINES', [
-    'marmiton.org',
-    '750g.com',
-    'cuisineaz.com',
-    'cuisine.journaldesfemmes.fr',
-    'ptitchef.com',
-    'chefsimon.com',
-    'ricardocuisine.com',
-    'cuisineactuelle.fr',
-    'hervecuisine.com',
-    'jow.fr',
-])
+def sites_import():
+    """Sites acceptés à l'import (gérés dans l'admin : modèle SiteImport), aussi listés dans l'interface."""
+    return SiteImport.objects.filter(actif=True)
 
 USER_AGENT = 'Mozilla/5.0 (compatible; GestionDeRecette/1.0; import de recette personnelle)'
 TIMEOUT_S = 10
@@ -62,7 +52,7 @@ class ImportRecetteErreur(Exception):
 
 def _domaine_autorise(host):
     host = (host or '').lower().rstrip('.')
-    return any(host == d or host.endswith('.' + d) for d in DOMAINES_AUTORISES)
+    return any(host == d or host.endswith('.' + d) for d in sites_import().values_list('domaine', flat=True))
 
 
 def _adresse_publique(host):
@@ -82,7 +72,7 @@ def _verifier_url(url, domaines_requis):
         raise ImportRecetteErreur("Adresse invalide.")
     if domaines_requis and not _domaine_autorise(parsed.hostname):
         raise ImportRecetteErreur(
-            "Ce site n'est pas pris en charge. Sites acceptés : " + ", ".join(DOMAINES_AUTORISES) + "."
+            "Ce site n'est pas pris en charge. Sites acceptés : " + ", ".join(sites_import().values_list('nom', flat=True)) + "."
         )
     if not _adresse_publique(parsed.hostname):
         raise ImportRecetteErreur("Adresse invalide.")
@@ -216,6 +206,64 @@ def _durees(recette):
     return preparation, cuisson, (repos if repos and repos > 0 else None)
 
 
+class _GroupesWprm(HTMLParser):
+    """Groupes d'ingrédients de WP Recipe Maker (extension WordPress utilisée par beaucoup de blogs).
+    Son JSON-LD donne les ingrédients à plat ; le HTML les range en groupes ("Sauce", "Marinade"...).
+    Résultat : [[nom ou '', nombre d'ingrédients], ...] dans l'ordre de la page."""
+
+    def __init__(self):
+        super().__init__()
+        self.groupes = []
+        self._nom = None  # morceaux du nom de groupe en cours de lecture
+        self._balise_nom = None
+
+    def handle_starttag(self, tag, attrs):
+        classes = (dict(attrs).get('class') or '').split()
+        if 'wprm-recipe-ingredient-group' in classes:
+            self.groupes.append(['', 0])
+        elif not self.groupes:
+            return
+        elif 'wprm-recipe-ingredient-group-name' in classes:
+            self._nom, self._balise_nom = [], tag
+        elif tag == 'li' and 'wprm-recipe-ingredient' in classes:
+            self.groupes[-1][1] += 1
+
+    def handle_data(self, data):
+        if self._nom is not None:
+            self._nom.append(data)
+
+    def handle_endtag(self, tag):
+        if self._nom is not None and tag == self._balise_nom:
+            self.groupes[-1][0] = _texte(''.join(self._nom))
+            self._nom = None
+
+
+def _ingredients(lignes, page_html):
+    """Liste de (isSection, texte) : les ingrédients du JSON-LD, avec les titres des groupes WP Recipe Maker
+    s'ils correspondent exactement (même nombre d'ingrédients), sinon à plat."""
+    a_plat = [(False, ligne) for ligne in lignes]
+    if 'wprm-recipe-ingredient-group' not in page_html:
+        return a_plat
+
+    parseur = _GroupesWprm()
+    try:
+        parseur.feed(page_html)
+    except Exception:
+        return a_plat
+    groupes = parseur.groupes
+    # Fiche affichée deux fois, ingrédient vide écarté du JSON-LD... : dans le doute, pas de sections
+    if not any(nom for nom, _ in groupes) or sum(n for _, n in groupes) != len(lignes):
+        return a_plat
+
+    resultat, debut = [], 0
+    for nom, nombre in groupes:
+        if nom:
+            resultat.append((True, nom[:500]))
+        resultat.extend((False, ligne) for ligne in lignes[debut:debut + nombre])
+        debut += nombre
+    return resultat
+
+
 def extraire_recette(page_html):
     """Données utiles du bloc schema.org Recipe de la page, ou erreur si la page n'en a pas."""
     for bloc in re.findall(r'<script[^>]*application/ld\+json[^>]*>(.*?)</script>', page_html, re.S | re.I):
@@ -233,7 +281,7 @@ def extraire_recette(page_html):
                 'titre': _texte(recette.get('name'))[:100] or 'Recette importée',
                 'portion': _portion(recette.get('recipeYield')),
                 'image': _url_image(recette.get('image')),
-                'ingredients': [t for t in (_texte(i) for i in recette.get('recipeIngredient') or []) if t],
+                'ingredients': _ingredients([t for t in (_texte(i) for i in recette.get('recipeIngredient') or []) if t], page_html),
                 'etapes': _etapes(recette.get('recipeInstructions')),
             }
     raise ImportRecetteErreur("Aucune recette trouvée sur cette page (est-ce bien la page d'une recette ?).")
@@ -278,6 +326,8 @@ FRACTIONS = {'½': ' 1/2', '¼': ' 1/4', '¾': ' 3/4', '⅓': ' 1/3', '⅔': ' 2
 # "1", "1,5", "0.5", "1 1/2", "1/2", suivi éventuellement d'une fourchette "2-3" / "2 à 3" (on garde la première valeur)
 RE_QUANTITE = re.compile(r'^(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)(?:\s*(?:-|a)\s*\d+(?:[.,]\d+)?)?\s*')
 RE_ARTICLE = re.compile(r"^(?:de la |de l'|des |du |de |d')")
+# note finale entre parenthèses, parenthèses imbriquées comprises : "oignons verts (hachées (vraiment fin))"
+RE_NOTE = re.compile(r"\s*\((.*)\)$")
 # préparation en fin de ligne (texte normalisé) : "oignons emincés" -> produit "oignon" + préparation "émincés"
 RE_PREPARATION = re.compile(
     r"(?:,\s*|\s)((?:hache|emince|rape|cisele|pele|presse|epluche|trempe|ramolli|fondu|coupe)(?:e|s|es)?"
@@ -361,15 +411,33 @@ class AnalyseurIngredients:
         nom = RE_ARTICLE.sub('', nom, count=1) if RE_ARTICLE.match(normaliser(nom)) else nom
 
         texte_produit = RE_ARTICLE.sub('', reste).strip()
-        produit, preparation = self._produit(texte_produit), ''
-        if produit is None:
-            # "oignons émincés", "beurre, fondu" : le produit sans sa préparation
-            trouve = RE_PREPARATION.search(texte_produit)
-            produit = self._produit(texte_produit[:trouve.start()].rstrip(' ,')) if trouve else None
-            if produit:
-                nb_mots_preparation = len(trouve.group(1).split())
-                preparation = ' '.join(ligne.split()[-nb_mots_preparation:]).strip(' ,')[:50]
+
+        # "4 gousses d'ail (émincées)" : la note finale entre parenthèses (WP Recipe Maker...) gêne la recherche
+        # du produit. Retirée pour chercher, puis gardée comme préparation, sauf si elle est trop longue
+        note = RE_NOTE.search(texte_produit)
+        note_origine = RE_NOTE.search(ligne.strip()) if note else None
+        if note and note_origine:
+            produit, preparation = self._produit_preparation(texte_produit[:note.start()].rstrip(' ,'), ligne.strip()[:note_origine.start()])
+            preparation = ', '.join(p for p in (preparation, note_origine.group(1).strip(' ,')) if p)
+            # sans produit, la ligne entière (note comprise) reste dans nom
+            if not produit or len(preparation) > 50:
+                produit, preparation = None, ''
+        else:
+            produit, preparation = self._produit_preparation(texte_produit, ligne)
         return quantite, unite, produit, (None if produit else (nom or ligne)[:500]), preparation
+
+    def _produit_preparation(self, texte_produit, ligne):
+        """(Produit ou None, préparation) ; texte_produit est normalisé, ligne est le texte d'origine qui se termine pareil."""
+        produit = self._produit(texte_produit)
+        if produit:
+            return produit, ''
+        # "oignons émincés", "beurre, fondu" : le produit sans sa préparation
+        trouve = RE_PREPARATION.search(texte_produit)
+        produit = self._produit(texte_produit[:trouve.start()].rstrip(' ,')) if trouve else None
+        if not produit:
+            return None, ''
+        nb_mots_preparation = len(trouve.group(1).split())
+        return produit, ' '.join(ligne.split()[-nb_mots_preparation:]).strip(' ,')[:50]
 
 
 # ---------- Création ----------
@@ -427,7 +495,10 @@ def importer_recette_depuis_url(url, user, type_recette, importer_image=True):
             recette.image.save(f"import.{extension}", ContentFile(contenu_image), save=True)
 
         ingredients = []
-        for i, ligne in enumerate(donnees['ingredients']):
+        for i, (is_section, ligne) in enumerate(donnees['ingredients']):
+            if is_section:
+                ingredients.append(Ingredient(recette=recette, noOrdre=i, isSection=True, nom=ligne))
+                continue
             quantite, unite, produit, nom, preparation = analyseur.analyser(ligne)
             ingredients.append(Ingredient(
                 recette=recette, noOrdre=i, isSection=False,

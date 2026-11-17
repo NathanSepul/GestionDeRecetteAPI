@@ -7,6 +7,14 @@ class ProduitMesureInline(admin.TabularInline):
     verbose_name_plural = "Mesures propres au produit (ex. 1 gousse = 5 g)"
 
 
+@admin.register(recette.models.SiteImport)
+class SiteImportAdmin(admin.ModelAdmin):
+    """Liste blanche des sites d'import : seules leurs pages sont téléchargées par le serveur."""
+    list_display = ('nom', 'domaine', 'url', 'actif')
+    list_editable = ('actif',)
+    search_fields = ('nom', 'domaine')
+
+
 @admin.register(recette.models.Produit)
 class ProduitAdmin(admin.ModelAdmin):
     list_display = ( 'nom','nomPluriel','rayon', 'placard', 'uniteAchat', 'densite', 'poidsPiece', 'produitDeBase', 'ratio_texte')

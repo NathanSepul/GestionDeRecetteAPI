@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 from django.db import models
 from typeRecette.models import TypeRecette
@@ -269,3 +270,31 @@ class Preparation(models.Model):
             return "%s..." % self.description[:30]
         return self.description
     
+
+
+class SiteImport(models.Model):
+    """Site dont on peut importer les recettes (liste blanche, gérée dans l'admin).
+    Seules les pages de ces domaines sont téléchargées par le serveur (protection SSRF, voir import_web.py)."""
+    nom = models.CharField(max_length=50)
+    # "marmiton.org" : les sous-domaines (www.marmiton.org) sont acceptés aussi
+    domaine = models.CharField(max_length=100, unique=True, help_text=_("Sans http:// ni www. ; ex. marmiton.org"))
+    url = models.URLField(help_text=_("Page d'accueil, ouverte depuis la fenêtre d'import"))
+    actif = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'site_import'
+        verbose_name = "site d'import"
+        verbose_name_plural = "sites d'import"
+        ordering = ['nom']
+
+    def __str__(self):
+        return self.nom
+
+    def clean(self):
+        # "https://www.Marmiton.org/" -> "marmiton.org"
+        domaine = (self.domaine or '').strip().lower()
+        domaine = re.sub(r'^[a-z]+://', '', domaine).split('/')[0]
+        domaine = re.sub(r'^www\.', '', domaine).rstrip('.')
+        if not re.fullmatch(r'(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}', domaine):
+            raise ValidationError({'domaine': _("Nom de domaine invalide (ex. marmiton.org).")})
+        self.domaine = domaine

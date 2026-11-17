@@ -1,5 +1,5 @@
-import os
 from decimal import Decimal
+import os
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
 from django.db.models import Case, F, IntegerField, Max, Value, When
@@ -12,11 +12,11 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from gestionDeRecette.api_views import IsOwner
 from gestionDeRecette.utils import reorder
-from recette.import_web import ImportRecetteErreur, importer_recette_depuis_url
+from recette.import_web import ImportRecetteErreur, importer_recette_depuis_url, sites_import
 from recette.liste_course import generer_liste_course
 from recette.models import Recette, Ingredient, Preparation, Produit, Unite
 from recette.serializer import (
-    RecetteSerializer, ImportRecetteSerializer, ImportUrlSerializer, ProduitSerializer, UniteSerializer,
+    RecetteSerializer, ImportRecetteSerializer, ImportUrlSerializer, ImportSiteSerializer, ProduitSerializer, UniteSerializer,
     IngredientSerializer, ReorderIngredientSerializer, PreparationSerializer, ReorderPreparationSerializer,
     ListeCourseRequestSerializer, ListeCourseItemSerializer,
 )
@@ -225,7 +225,13 @@ class RecetteViewSet(viewsets.ModelViewSet):
 
         result_serializer = RecetteSerializer(new_recette)
         return Response(result_serializer.data, status=status.HTTP_201_CREATED)
-    
+
+    @extend_schema(request=None, responses={200: ImportSiteSerializer(many=True)})
+    @action(detail=False, methods=['get'], url_path='import-sites', pagination_class=None)
+    def import_sites(self, request):
+        """Sites dont on peut importer les recettes (nom, domaine, adresse), pour les lister dans l'interface."""
+        return Response(ImportSiteSerializer(sites_import(), many=True).data)
+
     @action(detail=False, methods=['post'], url_path='import-url', serializer_class=ImportUrlSerializer)
     def import_url(self, request):
         """Importe une recette depuis un site de cuisine (Marmiton...) dans un type de l'utilisateur."""

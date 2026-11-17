@@ -33,14 +33,6 @@ class UserSerializer(serializers.ModelSerializer):
             # Vérifie si l'utilisateur connecté suit ce profil
             return request.user.following.filter(id=obj.id).exists()
 
-class MyRegistrationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = user.models.User
-        fields = ('email', 'first_name', 'last_name', 'password', 'language')
-    
-    def create(self, validated_data):
-        return  user.models.User.objects.create_user(**validated_data)
-
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     token_class = RefreshToken

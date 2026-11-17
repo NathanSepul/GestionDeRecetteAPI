@@ -1,5 +1,4 @@
 from django.http import QueryDict
-from django.shortcuts import render
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 
@@ -9,9 +8,6 @@ from rest_framework.decorators import action
 from gestionDeRecette.api_views import IsOwner
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from rest_registration import signals
-from rest_registration.api.views.register import register as rest_register
-from rest_registration.api.views.register import process_verify_registration_data, VerifyRegistrationSerializer
 from rest_registration.api.views.reset_password import process_reset_password_data, ResetPasswordSerializer, send_reset_password_link
 from rest_registration.utils.responses import get_ok_response
 from rest_registration.settings import registration_settings
@@ -87,34 +83,7 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response({'message': 'Profile successfully disabled.'})
 
 
-# REGISTRATION
-
-@extend_schema(tags=['Utilisateur'])
-def VerifyEmailView(request):
-    return render(request, 'registration/verify_email.html')
-
-@extend_schema(tags=['Utilisateur'])
-class VerifyRegistrationView(generics.GenericAPIView):
-    serializer_class = VerifyRegistrationSerializer
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request, *args, **kwargs):
-        user = process_verify_registration_data(request.data, serializer_context={'request': request})
-        signals.user_activated.send(sender=None, user=user, request=request)
-        refresh = RefreshToken.for_user(user)
-        return get_ok_response({
-            "user_id": str(user.id),
-            "refresh": str(refresh),
-            "access": str(refresh.access_token)
-        })
-
-@extend_schema(tags=['Utilisateur'])
-class RegisterView(generics.GenericAPIView):
-    serializer_class = registration_settings.REGISTER_SERIALIZER_CLASS
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request, *args, **kwargs):
-       return rest_register(request._request)
+# MOT DE PASSE (pas d'inscription libre : les comptes sont créés dans l'admin Django)
 
 @extend_schema(tags=['Utilisateur'])
 class SendResetPasswordLinkView(generics.GenericAPIView):

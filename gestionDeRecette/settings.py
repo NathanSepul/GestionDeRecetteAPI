@@ -214,26 +214,18 @@ SPECTACULAR_SETTINGS = {
 
 
 REST_REGISTRATION = {
-    'REGISTER_SERIALIZER_CLASS': 'user.serializer.MyRegistrationSerializer',
-    'REGISTER_VERIFICATION_ENABLED': True,
+    # Pas d'inscription libre : les comptes sont créés dans l'admin Django
+    'REGISTER_FLOW_ENABLED': False,
+    'REGISTER_VERIFICATION_ENABLED': False,
     'REGISTER_EMAIL_VERIFICATION_ENABLED': False,
     'RESET_PASSWORD_VERIFICATION_ENABLED': True,
 
-    'REGISTER_VERIFICATION_URL': 'https://sepul.be/verify-registration',
     'RESET_PASSWORD_VERIFICATION_URL': 'https://sepul.be/reset-password-form',
 
     'VERIFICATION_FROM_EMAIL': 'nathan@sepul.be',
 
-    'REGISTER_VERIFICATION_AUTO_LOGIN': True,
-    'REGISTER_VERIFICATION_ONE_TIME_USE': True,
     'RESET_PASSWORD_VERIFICATION_ONE_TIME_USE': True,
 
-    'REGISTER_VERIFICATION_EMAIL_TEMPLATES': {
-        'subject':  'email/registration/subject.txt',
-        'text_body':  'email/registration/body.txt',
-
-    },
-    
     'RESET_PASSWORD_VERIFICATION_EMAIL_TEMPLATES':{
         'subject':  'email/reset_password/subject.txt',
         'text_body':  'email/reset_password/body.txt',

@@ -25,9 +25,11 @@ class UserAdmin(BaseUserAdmin):
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser',)}),
     )
 
+    # Pas d'inscription libre : les comptes se créent ici. Avec « Authentification par mot de passe : désactivée »,
+    # la personne choisit elle-même son mot de passe via « Mot de passe oublié » dans l'app.
     add_fieldsets = (
         ("Inscription", {
-            'fields': (  'email', 'password1', 'password2', 'first_name', 'last_name',  ),
+            'fields': ('email', 'first_name', 'last_name', 'language', 'usable_password', 'password1', 'password2'),
         }),
     )
 

@@ -8,9 +8,7 @@ router.register(r'profile', api_views.UserViewSet, basename='user-profile')
 urlpatterns = [
     path('', include(router.urls)),
 
-    path('registration/register/', api_views.RegisterView.as_view()),
-    path('registration/verify-email/', api_views.VerifyEmailView),
-    path('registration/verify-registration/', api_views.VerifyRegistrationView.as_view()),
+    # Pas d'inscription libre : les comptes sont créés dans l'admin Django, le mot de passe se choisit via ce lien
     path('registration/send-reset-password-link/', api_views.SendResetPasswordLinkView.as_view()),
     path('registration/reset-password/', api_views.ResetPasswordView.as_view()),
     

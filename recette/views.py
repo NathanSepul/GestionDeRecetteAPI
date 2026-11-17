@@ -4,8 +4,7 @@ from django.http import HttpResponse
 from weasyprint import HTML
 from tag.models import Tag
 from .models import Recette, Ingredient, Preparation
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.decorators import api_view
 from drf_spectacular.utils import extend_schema
 from drf_spectacular.types import OpenApiTypes
 
@@ -15,8 +14,8 @@ from drf_spectacular.types import OpenApiTypes
     description="Génère le PDF de la recette"
 )
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def generer_pdf(request, id):
+    # Réservé aux utilisateurs connectés (JWT, comme le reste de l'API)
     recette = get_object_or_404(Recette, pk=id)
     ingredients = Ingredient.objects.filter(recette=recette).select_related('produit', 'unite').order_by('noOrdre')
     preparations = Preparation.objects.filter(recette=recette).order_by('noOrdre')
