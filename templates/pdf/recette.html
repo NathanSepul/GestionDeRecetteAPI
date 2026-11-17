@@ -217,6 +217,11 @@
 				<div class="meta-badges">
 					<span class="badge">{{ recette.typeRecette }}</span>
 					<span class="badge">{{ recette.portion }} portion{{ recette.portion|pluralize }}</span>
+					{% for libelle, duree in recette.durees_formatees %}
+					<span class="badge">{{ libelle }} : {{ duree }}</span>
+					{% endfor %}
+					{% if recette.cout %}<span class="badge">Coût : {{ recette.get_cout_display|lower }}</span>{% endif %}
+					{% if recette.difficulte %}<span class="badge">{{ recette.get_difficulte_display }}</span>{% endif %}
 				</div>
 				<div class="meta-badges">
 					{% for tag in tags %}

@@ -28,7 +28,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from PIL import Image
 
-from recette.models import Ingredient, Preparation, Produit, Recette, Unite
+from recette.models import DUREE_MAX_MINUTES, Ingredient, Preparation, Produit, Recette, Unite
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +194,28 @@ def _etapes(instructions):
     return etapes
 
 
+RE_DUREE_ISO = re.compile(r'^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:\d+(?:\.\d+)?S)?)?$', re.I)
+
+
+def _minutes(duree):
+    """Durée ISO 8601 ('PT1H30M', 'P0DT0H15M') -> 90 / 15 ; None si absente, nulle ou illisible."""
+    trouve = RE_DUREE_ISO.match(duree.strip()) if isinstance(duree, str) else None
+    if not trouve:
+        return None
+    jours, heures, minutes = (int(v or 0) for v in trouve.groups())
+    total = jours * 24 * 60 + heures * 60 + minutes
+    return total if 0 < total <= DUREE_MAX_MINUTES else None
+
+
+def _durees(recette):
+    """(préparation, cuisson, repos) en minutes. Le repos n'existe pas dans schema.org : c'est ce que totalTime
+    a en plus de préparation + cuisson (temps de repos, de levée, de réfrigération...)."""
+    preparation, cuisson = _minutes(recette.get('prepTime')), _minutes(recette.get('cookTime'))
+    total = _minutes(recette.get('totalTime'))
+    repos = total - (preparation or 0) - (cuisson or 0) if total and (preparation or cuisson) else None
+    return preparation, cuisson, (repos if repos and repos > 0 else None)
+
+
 def extraire_recette(page_html):
     """Données utiles du bloc schema.org Recipe de la page, ou erreur si la page n'en a pas."""
     for bloc in re.findall(r'<script[^>]*application/ld\+json[^>]*>(.*?)</script>', page_html, re.S | re.I):
@@ -203,7 +225,11 @@ def extraire_recette(page_html):
             continue
         recette = _chercher_recette(donnees)
         if recette:
+            preparation, cuisson, repos = _durees(recette)
             return {
+                'tempsPreparation': preparation,
+                'tempsCuisson': cuisson,
+                'tempsRepos': repos,
                 'titre': _texte(recette.get('name'))[:100] or 'Recette importée',
                 'portion': _portion(recette.get('recipeYield')),
                 'image': _url_image(recette.get('image')),
@@ -392,6 +418,9 @@ def importer_recette_depuis_url(url, user, type_recette, importer_image=True):
             portion=donnees['portion'],
             typeRecette=type_recette,
             source=url[:500],
+            tempsPreparation=donnees['tempsPreparation'],
+            tempsCuisson=donnees['tempsCuisson'],
+            tempsRepos=donnees['tempsRepos'],
         )
         if image:
             contenu_image, extension = image

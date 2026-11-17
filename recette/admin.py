@@ -49,9 +49,9 @@ class UniteAdmin(admin.ModelAdmin):
 @admin.register(recette.models.Recette)
 class RecetteAdmin(admin.ModelAdmin):
  
-    list_display = ( 'titre', 'portion', 'typeRecette')
+    list_display = ( 'titre', 'portion', 'typeRecette', 'cout', 'difficulte')
     readonly_fields =[ 'id','image_preview']
-    list_filter = ('typeRecette','user')
+    list_filter = ('typeRecette','user', 'cout', 'difficulte')
     list_per_page = 20
     search_fields = ('titre',)
     ordering = ('titre', )

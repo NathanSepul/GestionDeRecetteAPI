@@ -2,7 +2,8 @@ import os
 from decimal import Decimal
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from django.db.models import Case, IntegerField, Max, When
+from django.db.models import Case, F, IntegerField, Max, Value, When
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, status, generics, permissions
@@ -28,10 +29,27 @@ class RecetteViewSet(viewsets.ModelViewSet):
     queryset = Recette.objects.all()
     serializer_class = RecetteSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwner]
-    ORDER_BY_FIELDS = ('id', 'titre', 'portion', 'typeRecette')
+    ORDER_BY_FIELDS = ('id', 'titre', 'portion', 'typeRecette', 'tempsTotal', 'cout', 'difficulte')
+    # Champs souvent vides : les recettes sans valeur passent en fin de liste, quel que soit le sens du tri
+    ORDER_BY_NULLABLE = ('tempsTotal', 'cout', 'difficulte')
+
+    @staticmethod
+    def _liste_entiers(nom, valeur):
+        """'1,3' -> [1, 3] (paramètres de filtre)."""
+        try:
+            return list({int(v.strip()) for v in valeur.split(',') if v.strip()})
+        except ValueError:
+            raise ValidationError({nom: "Valeurs attendues : des entiers séparés par des virgules."})
 
     def get_queryset(self):
         queryset = super().get_queryset()
+
+        # Durée totale calculée en SQL pour filtrer / trier ; NULL si aucune durée n'est renseignée
+        queryset = queryset.annotate(tempsTotal=Case(
+            When(tempsPreparation__isnull=True, tempsCuisson__isnull=True, tempsRepos__isnull=True, then=Value(None)),
+            default=Coalesce('tempsPreparation', 0) + Coalesce('tempsCuisson', 0) + Coalesce('tempsRepos', 0),
+            output_field=IntegerField(),
+        ))
 
         # queryset = queryset.filter(user_id=self.request.user.id)
         queryparam_UserId = self.request.GET.get('userId', '')
@@ -61,12 +79,29 @@ class RecetteViewSet(viewsets.ModelViewSet):
 
             except ValueError:
                 raise ValidationError({"tags": "Les IDs de tags doivent être des entiers séparés par des virgules."})
-        
-       
+
+        # ?tempsMax=30 : durée totale <= 30 min (les recettes sans durée sont exclues)
+        queryparam_tempsMax = self.request.GET.get('tempsMax', '')
+        if queryparam_tempsMax:
+            try:
+                queryset = queryset.filter(tempsTotal__lte=int(queryparam_tempsMax))
+            except ValueError:
+                raise ValidationError({"tempsMax": "Durée en minutes attendue."})
+
+        # ?cout=1,2 / ?difficulte=1 : un ou plusieurs niveaux
+        for champ in ('cout', 'difficulte'):
+            valeur = self.request.GET.get(champ, '')
+            if valeur:
+                queryset = queryset.filter(**{f'{champ}__in': self._liste_entiers(champ, valeur)})
+
         if queryparam_OrderBy:
             # liste blanche : un champ libre permettrait de trier sur user__password et d'en déduire les hashs
-            if queryparam_OrderBy.lstrip('-') not in self.ORDER_BY_FIELDS:
+            champ = queryparam_OrderBy.lstrip('-')
+            if champ not in self.ORDER_BY_FIELDS:
                 raise ValidationError({"orderBy": f"Valeurs autorisées : {', '.join(self.ORDER_BY_FIELDS)} (préfixe '-' pour l'ordre décroissant)."})
+            if champ in self.ORDER_BY_NULLABLE:
+                expression = F(champ).desc(nulls_last=True) if queryparam_OrderBy.startswith('-') else F(champ).asc(nulls_last=True)
+                return queryset.order_by(expression, 'titre')
             return queryset.order_by(queryparam_OrderBy)
         else:
             return queryset.order_by('titre')
@@ -146,6 +181,11 @@ class RecetteViewSet(viewsets.ModelViewSet):
                     typeRecette=type_recette,
                     conseil=source_recette.conseil,
                     source=source_recette.source,
+                    tempsPreparation=source_recette.tempsPreparation,
+                    tempsCuisson=source_recette.tempsCuisson,
+                    tempsRepos=source_recette.tempsRepos,
+                    cout=source_recette.cout,
+                    difficulte=source_recette.difficulte,
                 )
 
                 # Copie de l'image (nouveau fichier physique, pas juste une référence)

@@ -8,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.text import slugify
 from django.db.models import Q
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator
 from gestionDeRecette.utils import register_image_cleanup
 
 def path_and_rename(instance, filename):
@@ -17,7 +18,30 @@ def path_and_rename(instance, filename):
         new_filename = f"{clean_name}_{unique_id}.{ext}"
         return os.path.join('photos/', new_filename)
 
+
+# Durées en minutes ; au-delà d'une semaine c'est forcément une faute de frappe
+DUREE_MAX_MINUTES = 7 * 24 * 60
+
+
+def formater_duree(minutes):
+    """90 -> '1 h 30 min', 45 -> '45 min', 120 -> '2 h'."""
+    heures, reste = divmod(minutes, 60)
+    if not heures:
+        return f"{reste} min"
+    return f"{heures} h {reste} min" if reste else f"{heures} h"
+
+
 class Recette(models.Model):
+    class Cout(models.IntegerChoices):
+        FAIBLE = 1, _("Faible")
+        MOYEN = 2, _("Moyen")
+        ELEVE = 3, _("Élevé")
+
+    class Difficulte(models.IntegerChoices):
+        FACILE = 1, _("Facile")
+        MOYENNE = 2, _("Moyenne")
+        DIFFICILE = 3, _("Difficile")
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name=_("Utilisateur"))
     titre = models.CharField(max_length=100)
     portion = models.IntegerField(blank=False, null=False)
@@ -26,6 +50,12 @@ class Recette(models.Model):
     conseil = models.TextField(blank=True, null=True)
     # page d'origine d'une recette importée (Marmiton...) : on cite toujours la source
     source = models.URLField(max_length=500, blank=True, null=True)
+    # Durées en minutes, vides si non renseignées ; le total est calculé (voir temps_total)
+    tempsPreparation = models.PositiveIntegerField(blank=True, null=True, validators=[MaxValueValidator(DUREE_MAX_MINUTES)])
+    tempsCuisson = models.PositiveIntegerField(blank=True, null=True, validators=[MaxValueValidator(DUREE_MAX_MINUTES)])
+    tempsRepos = models.PositiveIntegerField(blank=True, null=True, validators=[MaxValueValidator(DUREE_MAX_MINUTES)])
+    cout = models.PositiveSmallIntegerField(choices=Cout.choices, blank=True, null=True)
+    difficulte = models.PositiveSmallIntegerField(choices=Difficulte.choices, blank=True, null=True)
 
     class Meta:
         db_table = 'recette'
@@ -35,7 +65,21 @@ class Recette(models.Model):
     
     def __str__(self):
         return self.titre
-    
+
+    @property
+    def temps_total(self):
+        """Somme des durées renseignées, None si aucune ne l'est."""
+        durees = [d for d in (self.tempsPreparation, self.tempsCuisson, self.tempsRepos) if d is not None]
+        return sum(durees) if durees else None
+
+    def durees_formatees(self):
+        """Pour le PDF : [('Préparation', '15 min'), ...] des durées renseignées, total compris."""
+        durees = [(_("Préparation"), self.tempsPreparation), (_("Cuisson"), self.tempsCuisson), (_("Repos"), self.tempsRepos)]
+        lignes = [(libelle, formater_duree(d)) for libelle, d in durees if d]
+        if len(lignes) > 1:
+            lignes.append((_("Total"), formater_duree(self.temps_total)))
+        return lignes
+
     def image_preview(self):
         if self.image:
             return format_html('<img src="{}" style="width: 100px; height: auto; border-radius: 5px;" />', self.image.url)

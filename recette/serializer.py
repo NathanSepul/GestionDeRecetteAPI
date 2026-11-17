@@ -14,10 +14,14 @@ class RecetteSerializer(serializers.ModelSerializer):
     image = serializers.ImageField( required=False, max_length=None, use_url=True)
     imageThumb = ImageVariantField('image', 'thumb')
     imageMedium = ImageVariantField('image', 'medium')
-    
+    # préparation + cuisson + repos, en minutes (null si aucune durée n'est renseignée)
+    tempsTotal = serializers.IntegerField(source='temps_total', read_only=True)
+
     class Meta:
         model = recette.models.Recette
-        fields = ['id', 'titre', 'portion', 'typeRecette','image', 'imageThumb', 'imageMedium', 'conseil', 'source', 'adapteQuantity', 'user_id' ]
+        fields = ['id', 'titre', 'portion', 'typeRecette','image', 'imageThumb', 'imageMedium', 'conseil', 'source',
+                  'tempsPreparation', 'tempsCuisson', 'tempsRepos', 'tempsTotal', 'cout', 'difficulte',
+                  'adapteQuantity', 'user_id' ]
         read_only_fields = ['source']
 
     def validate_typeRecette(self, value):
