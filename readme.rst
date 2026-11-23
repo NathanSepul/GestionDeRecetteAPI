@@ -114,3 +114,38 @@ Le ``.env`` de prod contient ``DEBUG=off`` et ``STATIC_ROOT`` (dossier servi par
     sudo systemctl restart gunicornRecette
 
 Nginx sert directement ``/static/`` et ``/media/`` ; ``/api`` et ``/admin`` passent par Gunicorn.
+
+|
+
+Import depuis TikTok
+--------------------
+
+La recette est mise en forme par l'API Claude, qui lit toujours la description de la vidéo (yt-dlp) :
+
+* description qui contient visiblement la recette (« Ingrédients : », plusieurs quantités) : Claude la lit seule,
+  sans télécharger la vidéo (~5 s) ;
+* sinon, ou si la recette obtenue est incomplète (recette dite à l'oral ou écrite à l'écran) : la vidéo est téléchargée,
+  la voix transcrite sur le serveur par Whisper (faster-whisper) et une image prise toutes les 2 secondes ;
+  Claude reçoit le tout avec la description. Compter 1 à 2 minutes (surtout la transcription).
+
+Il faut ``ANTHROPIC_API_KEY`` dans le ``.env`` (sans clé, l'import TikTok est désactivé) : clé sur
+https://console.anthropic.com (crédit prépayé, de l'ordre de 0,05 à 0,2 centime par recette avec Claude Haiku).
+
+Le modèle Whisper (``WHISPER_MODELE``, ``small`` par défaut, ~500 Mo) est téléchargé au premier import. Pour le faire
+à l'avance (et vérifier que l'utilisateur de Gunicorn peut écrire dans ``~/.cache/huggingface``) :
+
+.. code-block:: sh
+
+    python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')"
+
+Le modèle reste en mémoire dans le processus Gunicorn (~500 Mo) : garder un seul worker (``-w 1 --threads 4``).
+
+L'import tourne en arrière-plan, une vidéo à la fois par processus (suivi dans l'admin : « Imports vidéo »).
+
+Surveillance de l'API Claude (admin : « État de l'API Claude ») : clé invalide, crédit épuisé, modèle retiré ou
+erreurs répétées déclenchent un e-mail à ``ALERTE_EMAIL`` (à défaut ``DEBUG_EMAIL``), une fois par panne. Pendant la panne,
+l'import TikTok est suspendu et l'API est réessayée toutes les 15 minutes ; un e-mail signale son retour.
+Après avoir rechargé le crédit, l'action « Revérifier l'API Claude maintenant » de l'admin rétablit le service tout de suite.
+
+TikTok change souvent son site : si les imports échouent, mettre à jour yt-dlp (``pip install -U yt-dlp``,
+puis reporter la version dans ``requirements.txt``).

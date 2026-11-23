@@ -189,6 +189,16 @@ EMAIL_USE_SSL = True
 STATIC_ROOT = env('STATIC_ROOT', default=os.path.join(BASE_DIR, 'staticfiles'))
 MEDIA_ROOT = env('MEDIA_ROOT', default=os.path.join(BASE_DIR, 'media'))
 
+# Import de recettes depuis une vidéo TikTok (recette/import_video.py, recette/import_ia.py) :
+# l'API Claude met en forme la recette (description, voix, texte à l'écran). Clé vide = import TikTok désactivé.
+ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')
+CLAUDE_MODELE = env('CLAUDE_MODELE', default='claude-haiku-5-5')
+# Destinataire des alertes (API Claude en panne : crédit épuisé, clé invalide...) ; vide = DEBUG_EMAIL
+ALERTE_EMAIL = env('ALERTE_EMAIL', default='')
+# Analyse de la vidéo quand sa description ne contient pas la recette (recette/import_media.py)
+WHISPER_MODELE = env('WHISPER_MODELE', default='small')
+VIDEO_DUREE_MAX = env.int('VIDEO_DUREE_MAX', default=600)
+
 STATIC_URL = 'static/'
 MEDIA_URL = 'media/'
 STATICFILES_FINDERS = (

@@ -15,10 +15,11 @@ from rest_framework.throttling import UserRateThrottle
 from gestionDeRecette.api_views import IsOwner
 from gestionDeRecette.utils import int_param, reorder
 from recette.import_web import ImportRecetteErreur, importer_recette_depuis_url, sites_import, titre_libre
+from recette.import_video import est_url_video, lancer_import, sites_video, statut_affiche, verifier_url_video
 from recette.liste_course import generer_liste_course
-from recette.models import Recette, Ingredient, Preparation, Produit, Unite
+from recette.models import ImportVideo, Recette, Ingredient, Preparation, Produit, Unite
 from recette.serializer import (
-    RecetteSerializer, EnregistrementRecetteSerializer, ImportRecetteSerializer, ImportUrlSerializer, ImportSiteSerializer, ProduitSerializer, UniteSerializer,
+    RecetteSerializer, EnregistrementRecetteSerializer, ImportRecetteSerializer, ImportUrlSerializer, ImportSiteSerializer, ImportVideoSerializer, ProduitSerializer, UniteSerializer,
     IngredientSerializer, ReorderIngredientSerializer, PreparationSerializer, ReorderPreparationSerializer,
     ListeCourseRequestSerializer, ListeCourseItemSerializer,
 )
@@ -355,7 +356,16 @@ class RecetteViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='import-sites', pagination_class=None)
     def import_sites(self, request):
         """Sites dont on peut importer les recettes (nom, domaine, adresse), pour les lister dans l'interface."""
-        return Response(ImportSiteSerializer(sites_import(), many=True).data)
+        return Response(ImportSiteSerializer(sites_import(), many=True).data + sites_video())
+
+    @extend_schema(request=None, responses={200: ImportVideoSerializer})
+    @action(detail=False, methods=['get'], url_path=r'import-video/(?P<import_id>\d+)', pagination_class=None)
+    def import_video(self, request, import_id=None):
+        """Avancement d'un import vidéo de l'utilisateur."""
+        tache = get_object_or_404(ImportVideo, pk=import_id, user=request.user)
+        donnees = ImportVideoSerializer(tache).data
+        donnees['statut'], donnees['erreur'] = statut_affiche(tache)
+        return Response(donnees)
 
     # le serveur télécharge la page et la photo : limité pour ne pas servir de relais de téléchargement
     @action(detail=False, methods=['post'], url_path='import-url', serializer_class=ImportUrlSerializer,
@@ -365,6 +375,20 @@ class RecetteViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         type_recette = get_object_or_404(TypeRecette, pk=serializer.validated_data['typeRecette'], user=request.user)
+        url = serializer.validated_data['url']
+
+        # Vidéo (TikTok) : traitée en arrière-plan, le client suit l'avancement via import-video/<id>/
+        if est_url_video(url):
+            try:
+                verifier_url_video(url)
+            except ImportRecetteErreur as e:
+                return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            tache = ImportVideo.objects.create(
+                user=request.user, url=url, typeRecette=type_recette,
+                importerImage=serializer.validated_data['importerImage'],
+            )
+            lancer_import(tache)
+            return Response({'importVideo': ImportVideoSerializer(tache).data}, status=status.HTTP_202_ACCEPTED)
 
         try:
             recette = importer_recette_depuis_url(

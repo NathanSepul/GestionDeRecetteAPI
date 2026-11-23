@@ -298,3 +298,60 @@ class SiteImport(models.Model):
         if not re.fullmatch(r'(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}', domaine):
             raise ValidationError({'domaine': _("Nom de domaine invalide (ex. marmiton.org).")})
         self.domaine = domaine
+
+
+class ImportVideo(models.Model):
+    """
+    Import d'une recette depuis une vidéo (TikTok...) : trop long pour une requête (modèle de langage local),
+    traité en arrière-plan ; le client interroge le statut jusqu'à la fin.
+    """
+    class Statut(models.TextChoices):
+        ATTENTE = 'attente', _("En attente")
+        EN_COURS = 'en_cours', _("En cours")
+        TERMINE = 'termine', _("Terminé")
+        ERREUR = 'erreur', _("Erreur")
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name=_("Utilisateur"))
+    url = models.URLField(max_length=500)
+    typeRecette = models.ForeignKey(TypeRecette, on_delete=models.CASCADE, verbose_name=_("Type de recette"))
+    importerImage = models.BooleanField(default=True)
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.ATTENTE)
+    recette = models.ForeignKey(Recette, on_delete=models.SET_NULL, blank=True, null=True)
+    erreur = models.TextField(blank=True, default='')
+    creeLe = models.DateTimeField(auto_now_add=True)
+    majLe = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'import_video'
+        verbose_name = "import vidéo"
+        verbose_name_plural = "imports vidéo"
+        ordering = ['-creeLe']
+
+    def __str__(self):
+        return f"{self.url} ({self.get_statut_display()})"
+
+
+class EtatClaude(models.Model):
+    """
+    État de l'API Claude (structuration des recettes vidéo), une seule ligne.
+    En panne (clé invalide, crédit épuisé, erreurs répétées...) : un e-mail d'alerte part une fois, l'API n'est plus
+    appelée qu'une fois par quart d'heure pour voir si elle refonctionne ; l'import vidéo est suspendu en attendant.
+    """
+    enPanne = models.BooleanField(default=False)
+    raison = models.TextField(blank=True, default='')
+    depuis = models.DateTimeField(blank=True, null=True)
+    derniereTentative = models.DateTimeField(blank=True, null=True)
+    # erreurs passagères (surcharge, réseau...) d'affilée : au-delà d'un seuil, c'est une panne
+    echecsTemporaires = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = 'etat_claude'
+        verbose_name = "état de l'API Claude"
+        verbose_name_plural = "état de l'API Claude"
+
+    def __str__(self):
+        return f"En panne depuis le {self.depuis:%d/%m/%Y %H:%M}" if self.enPanne else "Fonctionne"
+
+    @classmethod
+    def obtenir(cls):
+        return cls.objects.get_or_create(pk=1)[0]

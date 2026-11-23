@@ -81,3 +81,35 @@ class PreparationAdminTopic(admin.ModelAdmin):
     readonly_fields =[ 'id',]
     list_per_page = 20
     ordering = ('recette', 'noOrdre')
+
+
+@admin.register(recette.models.ImportVideo)
+class ImportVideoAdmin(admin.ModelAdmin):
+    """Suivi des imports TikTok (traités en arrière-plan) : utile pour voir pourquoi un import a échoué."""
+    list_display = ('url', 'user', 'statut', 'recette', 'creeLe')
+    list_filter = ('statut',)
+    readonly_fields = ('user', 'url', 'typeRecette', 'importerImage', 'statut', 'recette', 'erreur', 'creeLe', 'majLe')
+
+
+
+@admin.register(recette.models.EtatClaude)
+class EtatClaudeAdmin(admin.ModelAdmin):
+    """API Claude (import TikTok) : en panne ou non, pourquoi, et bouton pour revérifier après avoir rechargé le crédit."""
+    list_display = ('__str__', 'raison', 'derniereTentative')
+    readonly_fields = ('enPanne', 'raison', 'depuis', 'derniereTentative', 'echecsTemporaires')
+    actions = ['reverifier']
+
+    def has_add_permission(self, request):
+        return False
+
+    def get_queryset(self, request):
+        # la ligne unique existe toujours, pour pouvoir lancer la vérification avant le premier import
+        recette.models.EtatClaude.obtenir()
+        return super().get_queryset(request)
+
+    @admin.action(description="Revérifier l'API Claude maintenant")
+    def reverifier(self, request, queryset):
+        from django.contrib import messages
+        from recette.import_ia import verifier_maintenant
+        ok, message = verifier_maintenant()
+        self.message_user(request, message, messages.SUCCESS if ok else messages.ERROR)

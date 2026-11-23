@@ -34,6 +34,12 @@ class ImportUrlSerializer(serializers.Serializer):
     typeRecette = serializers.IntegerField()
     importerImage = serializers.BooleanField(default=True)
 
+class ImportVideoSerializer(serializers.ModelSerializer):
+    """Suivi d'un import vidéo ; recette = id de la recette créée une fois terminé."""
+    class Meta:
+        model = recette.models.ImportVideo
+        fields = ['id', 'statut', 'recette', 'erreur']
+
 class ImportSiteSerializer(serializers.ModelSerializer):
     class Meta:
         model = recette.models.SiteImport

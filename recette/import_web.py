@@ -474,7 +474,14 @@ def importer_recette_depuis_url(url, user, type_recette, importer_image=True):
     donnees = extraire_recette(contenu.decode(charset or 'utf-8', errors='replace'))
     if not donnees['ingredients'] and not donnees['etapes']:
         raise ImportRecetteErreur("La recette de cette page est vide.")
+    return creer_recette_importee(donnees, url, user, type_recette, importer_image)
 
+
+def creer_recette_importee(donnees, url, user, type_recette, importer_image=True):
+    """
+    Crée la recette à partir des données extraites (même forme que extraire_recette : titre, portion, image,
+    durées, ingredients et etapes en listes de (isSection, texte)). Sert aussi à l'import vidéo.
+    """
     # téléchargée avant la transaction : pas de verrou en base pendant l'attente réseau
     image = _telecharger_image(donnees['image']) if importer_image else None
     analyseur = AnalyseurIngredients()

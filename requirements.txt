@@ -10,3 +10,8 @@ PyMySQL==1.2.0
 Pillow==12.3.0
 weasyprint==69.0
 gunicorn==26.0.0
+yt-dlp==2026.10.26
+anthropic==2.12.0
+faster-whisper==1.2.1
+# av 16+ est incompatible avec faster-whisper 1.2.1
+av==15.1.0

@@ -1,10 +1,21 @@
-from django.test import SimpleTestCase, TestCase
+import json
+from datetime import timedelta
+from unittest.mock import Mock, patch
+
+import anthropic
+import httpx2 as httpx
+from django.core import mail
+
+from django.test import SimpleTestCase, TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from recette.import_web import AnalyseurIngredients, _domaine_autorise, _durees, _ingredients, _minutes
 from django.core.exceptions import ValidationError
 
-from recette.models import Produit, Recette, SiteImport, Unite, formater_duree
+from recette import import_ia, import_video
+from recette.import_ia import ClaudeIndisponible
+from recette.models import EtatClaude, ImportVideo, Produit, Recette, SiteImport, Unite, formater_duree
 from typeRecette.models import TypeRecette
 from user.models import User
 
@@ -367,3 +378,250 @@ class EnregistrementRecetteTests(TestCase):
         import json
         res = self.client.post('/api/recette/enregistrer/', {'donnees': json.dumps(self.donnees())}, format='multipart')
         self.assertEqual(res.status_code, 201, res.data)
+
+
+DESCRIPTION_STRUCTUREE = """Crêpes moelleuses 🥞 pour 6 personnes
+Préparation : 10 min
+Cuisson : 1 h 5
+Ingrédients :
+- 250 g de farine
+- 3 oeufs
+• 50 cl de lait
+Pour la garniture :
+- sucre
+Étapes :
+1️⃣ Mélanger la farine et les oeufs.
+2) Ajouter le lait petit à petit.
+#crepes #recette @chef"""
+
+DESCRIPTION_UNE_LIGNE = ("pommes de terre caramélisées au miel  Pour 2-3 personnes  Ingrédients : - 300 g de petites pommes de terre "
+                         "- Huile de sésame - 3 gousses d'ail -250ml Eau - 2 cas de miel Miel - 80ml de Sauce soja "
+                         "Instructions : 1. Laver les pommes de terre. 2. Ajouter l'ail. 3. Verser le mélange.")
+
+DESCRIPTION_EN_PROSE = "Trop bonnes ces crêpes 😍 il te faut de la farine, des oeufs et du lait, tu mélanges et c'est prêt ! #crepes"
+
+
+class DescriptionAvecRecetteTests(SimpleTestCase):
+    """Décide seulement s'il faut télécharger la vidéo : Claude lit la description dans tous les cas."""
+
+    def test_recette_visible(self):
+        self.assertTrue(import_video.description_avec_recette(DESCRIPTION_STRUCTUREE))
+        self.assertTrue(import_video.description_avec_recette(DESCRIPTION_UNE_LIGNE))
+
+    def test_pas_de_recette(self):
+        self.assertFalse(import_video.description_avec_recette(DESCRIPTION_EN_PROSE))
+        self.assertFalse(import_video.description_avec_recette("🌟🍝BEST PASTA🍝🌟 " + "#recette #recettefacile #pasta " * 5))
+
+
+@override_settings(ANTHROPIC_API_KEY='cle-de-test')
+class ImportVideoTests(TestCase):
+    """Import TikTok : lecture de la vidéo et IA simulées (ni réseau ni API en test)."""
+
+    REPONSE_IA = {
+        'titre': 'Crêpes', 'portion': 4, 'tempsPreparation': 10, 'tempsCuisson': None,
+        'ingredients': ['250 g de farine', '3 oeufs', ''], 'etapes': ['Mélanger la farine et les oeufs.', 'Ajouter le lait.'],
+    }
+
+    def setUp(self):
+        self.user = User.objects.create_user(email='chef@example.com', password='motdepasse123', is_active=True)
+        self.type = TypeRecette.objects.create(user=self.user, type='Plat')
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        Unite.objects.get_or_create(code='g', defaults={'description': 'gramme', 'dimension': 'masse', 'facteur': 1})
+        Produit.objects.get_or_create(nom='farine')
+
+    def lancer(self, url='https://vm.tiktok.com/ZMabc123/'):
+        with patch('recette.import_video._adresse_publique', return_value=True):
+            res = self.client.post('/api/recette/import-url/', {'url': url, 'typeRecette': self.type.id, 'importerImage': False}, format='json')
+        self.assertEqual(res.status_code, 202, res.data)
+        return res.data['importVideo']['id']
+
+    def suivre(self, import_id):
+        res = self.client.get(f'/api/recette/import-video/{import_id}/')
+        self.assertEqual(res.status_code, 200, res.data)
+        return res.data
+
+    def importer(self, description, **patch_ia):
+        import_id = self.lancer()
+        self.assertEqual(self.suivre(import_id)['statut'], 'attente')
+        video = {'titre': 'Les meilleures crêpes 🥞 #recette', 'description': description, 'miniature': None}
+        with patch('recette.import_video.lire_video', return_value=video), \
+             patch('recette.import_video.media_disponible', return_value=True), \
+             patch('recette.import_video.analyser_video', return_value=('Je vous note les ingrédients', [b'jpeg'])) as media, \
+             patch('recette.import_video.structurer_avec_claude', **patch_ia) as ia:
+            import_video.traiter(import_id)
+        self.media = media
+        return self.suivre(import_id), ia
+
+    def test_description_toujours_lue_par_l_ia(self):
+        suivi, ia = self.importer(DESCRIPTION_STRUCTUREE, return_value=self.REPONSE_IA)
+        self.assertEqual(suivi['statut'], 'termine', suivi)
+        self.assertEqual(ia.call_args.args, ('Les meilleures crêpes 🥞 #recette', DESCRIPTION_STRUCTUREE))
+        self.media.assert_not_called()
+        recette = Recette.objects.get(pk=suivi['recette'])
+        self.assertEqual((recette.titre, recette.source), ('Crêpes', 'https://vm.tiktok.com/ZMabc123/'))
+        farine = recette.ingredient_set.get(noOrdre=0)
+        self.assertEqual((farine.quantite, farine.unite.code, farine.produit.nom), (250, 'g', 'farine'))
+
+    def test_prose_confiee_a_l_ia(self):
+        suivi, ia = self.importer(DESCRIPTION_EN_PROSE, return_value=self.REPONSE_IA)
+        self.assertEqual(suivi['statut'], 'termine', suivi)
+        # voix et images de la vidéo transmises à l'IA
+        self.assertEqual(ia.call_args.args[2:], ('Je vous note les ingrédients', [b'jpeg']))
+        recette = Recette.objects.get(pk=suivi['recette'])
+        self.assertEqual((recette.titre, recette.tempsPreparation, recette.ingredient_set.count(), recette.preparation_set.count()), ('Crêpes', 10, 2, 2))
+
+    def test_recette_dans_la_description_sans_telecharger_la_video(self):
+        suivi, ia = self.importer(DESCRIPTION_UNE_LIGNE, return_value=self.REPONSE_IA)
+        self.assertEqual(suivi['statut'], 'termine', suivi)
+        self.assertEqual(len(ia.call_args.args), 2)  # titre et description seulement
+        self.media.assert_not_called()
+
+    def test_description_insuffisante_puis_video(self):
+        vide = {**self.REPONSE_IA, 'ingredients': ['sel'], 'etapes': []}
+        suivi, ia = self.importer(DESCRIPTION_UNE_LIGNE, side_effect=[vide, self.REPONSE_IA])
+        self.assertEqual(suivi['statut'], 'termine', suivi)
+        self.assertEqual(ia.call_count, 2)
+        self.media.assert_called_once()
+
+    def test_ia_indisponible(self):
+        suivi, _ = self.importer(DESCRIPTION_EN_PROSE, side_effect=ClaudeIndisponible('crédit épuisé'))
+        self.assertEqual((suivi['statut'], suivi['recette']), ('erreur', None))
+        self.assertIn('momentanément indisponible', suivi['erreur'])
+        self.assertEqual(Recette.objects.count(), 0)
+
+    @override_settings(ANTHROPIC_API_KEY='')
+    def test_sans_cle_import_desactive(self):
+        with patch('recette.import_video._adresse_publique', return_value=True):
+            res = self.client.post('/api/recette/import-url/', {'url': 'https://www.tiktok.com/@chef/video/1', 'typeRecette': self.type.id}, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(ImportVideo.objects.exists())
+        self.assertNotIn('tiktok.com', [s['domaine'] for s in self.client.get('/api/recette/import-sites/').data])
+
+    def test_ia_en_panne_ne_lit_pas_la_video(self):
+        EtatClaude.objects.create(pk=1, enPanne=True, derniereTentative=timezone.now())
+        import_id = self.lancer()
+        with patch('recette.import_video.lire_video') as lire:
+            import_video.traiter(import_id)
+        lire.assert_not_called()
+        self.assertIn('momentanément indisponible', self.suivre(import_id)['erreur'])
+
+    def test_description_sans_recette(self):
+        suivi, _ = self.importer(DESCRIPTION_EN_PROSE, return_value={**self.REPONSE_IA, 'ingredients': [], 'etapes': []})
+        self.assertEqual(suivi['statut'], 'erreur')
+        self.assertIn('Aucune recette', suivi['erreur'])
+
+    def test_import_interrompu_signale(self):
+        import_id = self.lancer()
+        ImportVideo.objects.filter(pk=import_id).update(creeLe=timezone.now() - timedelta(hours=1))
+        self.assertEqual(self.suivre(import_id)['statut'], 'erreur')
+
+    def test_suivi_reserve_a_son_auteur(self):
+        import_id = self.lancer()
+        autre = APIClient()
+        autre.force_authenticate(User.objects.create_user(email='autre@example.com', password='motdepasse123', is_active=True))
+        self.assertEqual(autre.get(f'/api/recette/import-video/{import_id}/').status_code, 404)
+
+    def test_site_tiktok_liste(self):
+        domaines = [s['domaine'] for s in self.client.get('/api/recette/import-sites/').data]
+        self.assertIn('tiktok.com', domaines)
+
+    def test_donnees_ia_nettoyees(self):
+        video = {'titre': 'Les meilleures crêpes', 'description': '', 'miniature': None}
+        donnees = import_video.donnees_recette(video, {'titre': '', 'portion': 0, 'tempsPreparation': -5, 'tempsCuisson': True,
+                                                       'ingredients': 'pas une liste', 'etapes': ['  <b>Cuire</b>  ']})
+        self.assertEqual(donnees['titre'], 'Les meilleures crêpes')
+        self.assertEqual((donnees['portion'], donnees['tempsPreparation'], donnees['tempsCuisson']), (4, None, None))
+        self.assertEqual((donnees['ingredients'], donnees['etapes']), ([], [(False, 'Cuire')]))
+
+
+def _erreur_api(classe, status):
+    reponse = httpx.Response(status, request=httpx.Request('POST', 'https://api.anthropic.com/v1/messages'))
+    return classe(f"erreur {status}", response=reponse, body=None)
+
+
+def _reponse_ia(contenu):
+    return Mock(stop_reason='end_turn', content=[Mock(type='text', text=json.dumps(contenu))])
+
+
+@override_settings(ANTHROPIC_API_KEY='cle-de-test', ALERTE_EMAIL='admin@example.com')
+class SurveillanceClaudeTests(TestCase):
+    """Pannes de l'API Claude : alerte unique, pause entre les tentatives, rétablissement."""
+
+    def structurer(self, effet):
+        with patch('recette.import_ia._client') as client:
+            client.return_value.messages.create.side_effect = effet if isinstance(effet, (Exception, list)) else None
+            if not isinstance(effet, (Exception, list)):
+                client.return_value.messages.create.return_value = effet
+            try:
+                return import_ia.structurer_avec_claude('Crêpes', 'description')
+            finally:
+                self.appels = client.return_value.messages.create.call_count
+
+    def test_succes(self):
+        self.assertEqual(self.structurer(_reponse_ia({'titre': 'Crêpes'})), {'titre': 'Crêpes'})
+        self.assertFalse(EtatClaude.obtenir().enPanne)
+
+    def test_credit_epuise_alerte_une_seule_fois(self):
+        with self.assertRaises(ClaudeIndisponible):
+            self.structurer(_erreur_api(anthropic.PaymentRequiredError, 402))
+        etat = EtatClaude.obtenir()
+        self.assertTrue(etat.enPanne)
+        self.assertIn('402', etat.raison)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['admin@example.com'])
+
+        # pendant la panne : l'API n'est pas rappelée avant 15 minutes, pas de deuxième e-mail
+        with self.assertRaises(ClaudeIndisponible):
+            self.structurer(_reponse_ia({'titre': 'Crêpes'}))
+        self.assertEqual(self.appels, 0)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_retablissement(self):
+        with self.assertRaises(ClaudeIndisponible):
+            self.structurer(_erreur_api(anthropic.AuthenticationError, 401))
+        EtatClaude.objects.update(derniereTentative=timezone.now() - timedelta(minutes=16))
+        self.structurer(_reponse_ia({'titre': 'Crêpes'}))
+        self.assertFalse(EtatClaude.obtenir().enPanne)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertIn('refonctionne', mail.outbox[1].subject)
+
+    def test_erreurs_passageres_repetees(self):
+        for _ in range(import_ia.SEUIL_ECHECS_TEMPORAIRES - 1):
+            with self.assertRaises(ClaudeIndisponible):
+                self.structurer(_erreur_api(anthropic.OverloadedError, 529))
+        self.assertFalse(EtatClaude.obtenir().enPanne)
+        self.assertEqual(len(mail.outbox), 0)
+        with self.assertRaises(ClaudeIndisponible):
+            self.structurer(anthropic.APIConnectionError(request=httpx.Request('POST', 'https://api.anthropic.com')))
+        self.assertTrue(EtatClaude.obtenir().enPanne)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_un_succes_remet_le_compteur_a_zero(self):
+        with self.assertRaises(ClaudeIndisponible):
+            self.structurer(_erreur_api(anthropic.OverloadedError, 529))
+        self.structurer(_reponse_ia({}))
+        self.assertEqual(EtatClaude.obtenir().echecsTemporaires, 0)
+
+    def test_verification_manuelle_pendant_la_panne(self):
+        with self.assertRaises(ClaudeIndisponible):
+            self.structurer(_erreur_api(anthropic.PaymentRequiredError, 402))
+        with patch('recette.import_ia._client') as client:
+            client.return_value.messages.create.return_value = _reponse_ia({})
+            self.assertEqual(import_ia.verifier_maintenant(), (True, "L'API Claude répond."))
+        self.assertFalse(EtatClaude.obtenir().enPanne)
+
+    def test_images_et_transcription_envoyees(self):
+        with patch('recette.import_ia._client') as client:
+            client.return_value.messages.create.return_value = _reponse_ia({})
+            import_ia.structurer_avec_claude('Crêpes', 'desc', 'il te faut', [b'image1', b'image2'])
+            contenu = client.return_value.messages.create.call_args.kwargs['messages'][0]['content']
+        self.assertEqual([bloc['type'] for bloc in contenu], ['image', 'image', 'text'])
+        self.assertEqual(contenu[0]['source']['data'], 'aW1hZ2Ux')
+        self.assertIn('<transcription>\nil te faut\n</transcription>', contenu[2]['text'])
+
+    @override_settings(ANTHROPIC_API_KEY='')
+    def test_sans_cle(self):
+        with self.assertRaises(ClaudeIndisponible):
+            import_ia.structurer_avec_claude('Crêpes', 'description')
+        self.assertFalse(EtatClaude.objects.exists())
