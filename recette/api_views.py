@@ -1,4 +1,5 @@
 from decimal import Decimal
+import json
 import os
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
@@ -6,7 +7,7 @@ from django.db.models import Case, F, IntegerField, Max, Value, When
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
-from rest_framework import viewsets, status, generics, permissions
+from rest_framework import viewsets, status, generics, permissions, serializers
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
@@ -17,10 +18,11 @@ from recette.import_web import ImportRecetteErreur, importer_recette_depuis_url,
 from recette.liste_course import generer_liste_course
 from recette.models import Recette, Ingredient, Preparation, Produit, Unite
 from recette.serializer import (
-    RecetteSerializer, ImportRecetteSerializer, ImportUrlSerializer, ImportSiteSerializer, ProduitSerializer, UniteSerializer,
+    RecetteSerializer, EnregistrementRecetteSerializer, ImportRecetteSerializer, ImportUrlSerializer, ImportSiteSerializer, ProduitSerializer, UniteSerializer,
     IngredientSerializer, ReorderIngredientSerializer, PreparationSerializer, ReorderPreparationSerializer,
     ListeCourseRequestSerializer, ListeCourseItemSerializer,
 )
+from tag.models import Tag
 from typeRecette.models import TypeRecette
 
 
@@ -163,6 +165,119 @@ class RecetteViewSet(viewsets.ModelViewSet):
             updated_instance.refresh_from_db()
             return Response(self.get_serializer(updated_instance).data)
    
+    # --- Enregistrement complet (écran d'édition) : recette, ingrédients, étapes, tags et image en une transaction ---
+
+    @staticmethod
+    def _synchroniser_lignes(modele, recette, lignes, champs):
+        """
+        Remplace les lignes (ingrédients ou étapes) de la recette par `lignes` : avec id = mise à jour, sans id = création,
+        absente = suppression. noOrdre = position dans la liste.
+        """
+        existantes = {ligne.id: ligne for ligne in modele.objects.filter(recette=recette)}
+        gardees = {ligne['id'] for ligne in lignes if ligne.get('id')}
+        if gardees - existantes.keys():
+            raise ValidationError({modele._meta.model_name: "Ligne inconnue pour cette recette."})
+
+        modele.objects.filter(recette=recette).exclude(id__in=gardees).delete()
+
+        a_modifier, a_creer = [], []
+        for ordre, ligne in enumerate(lignes):
+            valeurs = {champ: ligne[champ] for champ in champs if champ in ligne}
+            if ligne.get('id'):
+                objet = existantes[ligne['id']]
+                for champ, valeur in valeurs.items():
+                    setattr(objet, champ, valeur)
+                objet.noOrdre = ordre
+                a_modifier.append(objet)
+            else:
+                a_creer.append(modele(recette=recette, noOrdre=ordre, **valeurs))
+
+        if a_modifier:
+            modele.objects.bulk_update(a_modifier, [*champs, 'noOrdre'])
+        modele.objects.bulk_create(a_creer)
+
+    def _enregistrer(self, request, instance):
+        """
+        Corps JSON, ou multipart avec le JSON dans "donnees" et la photo dans "image".
+        Tout est enregistré ou rien : une erreur (validation, titre déjà pris...) annule l'ensemble.
+        """
+        brut = request.data.get('donnees')
+        if isinstance(brut, str):
+            try:
+                brut = json.loads(brut)
+            except ValueError:
+                raise ValidationError({"donnees": "JSON invalide."})
+        elif brut is None:
+            brut = request.data
+
+        entree = EnregistrementRecetteSerializer(data=brut)
+        entree.is_valid(raise_exception=True)
+        donnees = entree.validated_data
+
+        # Image validée avant la transaction, enregistrée en dernier : un échec plus tôt n'écrit aucun fichier
+        image = request.FILES.get('image')
+        if image:
+            image = serializers.ImageField().run_validation(image)
+
+        champs_recette = {k: v for k, v in donnees['recette'].items() if k not in ('image', 'adapteQuantity')}
+
+        try:
+            with transaction.atomic():
+                ancienne_portion = None
+                if instance is not None:
+                    # Verrou : deux enregistrements simultanés de la même recette passent l'un après l'autre
+                    instance = Recette.objects.select_for_update().get(pk=instance.pk)
+                    ancienne_portion = instance.portion
+
+                recette_serializer = RecetteSerializer(instance, data=champs_recette, partial=instance is not None,
+                                                       context=self.get_serializer_context())
+                recette_serializer.is_valid(raise_exception=True)
+                recette_serializer.validated_data.pop('adapteQuantity', None)
+                recette = recette_serializer.save(**({} if instance is not None else {'user': request.user}))
+
+                self._synchroniser_lignes(Ingredient, recette, donnees['ingredients'],
+                                          ['isSection', 'quantite', 'nom', 'unite', 'produit', 'preparation'])
+                if donnees['adapteQuantity'] and ancienne_portion and recette.portion != ancienne_portion:
+                    self._adapt_ingredient_quantities(recette, recette.portion / ancienne_portion)
+
+                self._synchroniser_lignes(Preparation, recette, donnees['etapes'], ['isSection', 'description'])
+
+                if donnees['tags'] is not None:
+                    ids = set(donnees['tags'])
+                    tags = list(Tag.objects.filter(user=request.user, id__in=ids))
+                    if len(tags) != len(ids):
+                        raise ValidationError({"tags": "Tag inconnu."})
+                    recette.tags.set(tags)
+
+                if image:
+                    recette.image = image
+                    recette.save(update_fields=['image'])
+        except IntegrityError:
+            return Response(
+                {"detail": "Une recette avec ce titre existe déjà pour ce type de recette."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        recette.refresh_from_db()
+        return Response({
+            'recette': RecetteSerializer(recette, context=self.get_serializer_context()).data,
+            'ingredients': IngredientSerializer(recette.ingredient_set.select_related('produit', 'unite').order_by('noOrdre'), many=True).data,
+            'etapes': PreparationSerializer(recette.preparation_set.order_by('noOrdre'), many=True).data,
+            'tags': sorted(recette.tags.values_list('id', flat=True)),
+        }, status=status.HTTP_200_OK if instance is not None else status.HTTP_201_CREATED)
+
+    @extend_schema(request=EnregistrementRecetteSerializer)
+    @action(detail=False, methods=['post'], url_path='enregistrer', serializer_class=EnregistrementRecetteSerializer)
+    def enregistrer_nouvelle(self, request):
+        """Crée une recette complète (recette, ingrédients, étapes, tags, image) en une seule transaction."""
+        return self._enregistrer(request, None)
+
+    @extend_schema(request=EnregistrementRecetteSerializer)
+    @action(detail=True, methods=['put'], url_path='enregistrer', serializer_class=EnregistrementRecetteSerializer)
+    def enregistrer(self, request, pk=None):
+        """Remplace une recette complète (recette, ingrédients, étapes, tags, image) en une seule transaction."""
+        return self._enregistrer(request, self.get_object())
+
     @action(detail=False, methods=['post'], url_path='import', serializer_class=ImportRecetteSerializer)
     def import_recette(self, request):
         """Importe une copie d'une recette d'un autre utilisateur (sans le type ni les tags)."""

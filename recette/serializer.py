@@ -119,3 +119,51 @@ class ListeCourseItemSerializer(serializers.Serializer):
     unite = UniteSerializer(allow_null=True)
     quantite = serializers.DecimalField(max_digits=9, decimal_places=2, allow_null=True)
     
+
+#
+# ----------------------------------
+# Enregistrement complet d'une recette (une seule transaction)
+# ----------------------------------
+#
+
+class LigneIngredientSerializer(serializers.ModelSerializer):
+    """Ligne de la liste finale : avec id = ingrédient existant à modifier, sans id = à créer. L'ordre de la liste donne noOrdre."""
+    id = serializers.IntegerField(required=False, allow_null=True)
+
+    class Meta:
+        model = recette.models.Ingredient
+        fields = ['id', 'isSection', 'quantite', 'nom', 'unite', 'produit', 'preparation']
+
+
+class LigneEtapeSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(required=False, allow_null=True)
+
+    class Meta:
+        model = recette.models.Preparation
+        fields = ['id', 'isSection', 'description']
+
+
+class EnregistrementRecetteSerializer(serializers.Serializer):
+    """
+    État complet de la recette après édition. Les listes remplacent celles en base :
+    une ligne en base absente de la liste est supprimée.
+    """
+    recette = serializers.DictField()
+    ingredients = LigneIngredientSerializer(many=True)
+    etapes = LigneEtapeSerializer(many=True)
+    # null = tags non modifiés
+    tags = serializers.ListField(child=serializers.IntegerField(), allow_null=True, required=False, default=None)
+    adapteQuantity = serializers.BooleanField(default=False)
+
+    @staticmethod
+    def _ids_uniques(lignes):
+        ids = [ligne['id'] for ligne in lignes if ligne.get('id')]
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError("Une même ligne apparaît deux fois.")
+        return lignes
+
+    def validate_ingredients(self, lignes):
+        return self._ids_uniques(lignes)
+
+    def validate_etapes(self, lignes):
+        return self._ids_uniques(lignes)

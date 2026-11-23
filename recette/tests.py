@@ -279,3 +279,91 @@ class ValidationParametresTests(TestCase):
     def test_type_de_recette_long(self):
         res = self.client.post('/api/typeRecette/', {'type': 'Accompagnement'}, format='json')
         self.assertEqual(res.status_code, 201, res.data)
+
+
+class EnregistrementRecetteTests(TestCase):
+    """POST /recette/enregistrer/ et PUT /recette/<id>/enregistrer/ : tout ou rien."""
+
+    def setUp(self):
+        from tag.models import Tag
+        self.user = User.objects.create_user(email='chef@example.com', password='motdepasse123', is_active=True)
+        self.type = TypeRecette.objects.create(user=self.user, type='Plat')
+        self.tag = Tag.objects.create(user=self.user, tag='Été', opacite=255, red=1, green=2, blue=3)
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def donnees(self, **autres):
+        return {
+            'recette': {'titre': 'Crêpes', 'portion': 4, 'typeRecette': self.type.id},
+            'ingredients': [{'isSection': False, 'nom': 'farine', 'quantite': '250'}, {'isSection': False, 'nom': 'lait', 'quantite': '50'}],
+            'etapes': [{'isSection': False, 'description': 'Mélanger'}],
+            'tags': [self.tag.id],
+            **autres,
+        }
+
+    def creer(self):
+        res = self.client.post('/api/recette/enregistrer/', self.donnees(), format='json')
+        self.assertEqual(res.status_code, 201, res.data)
+        return res.data
+
+    def test_creation_complete(self):
+        data = self.creer()
+        recette = Recette.objects.get(pk=data['recette']['id'])
+        self.assertEqual(list(recette.ingredient_set.order_by('noOrdre').values_list('nom', 'noOrdre')), [('farine', 0), ('lait', 1)])
+        self.assertEqual(recette.preparation_set.count(), 1)
+        self.assertEqual(data['tags'], [self.tag.id])
+
+    def test_modification_supprime_reordonne_adapte(self):
+        data = self.creer()
+        farine, lait = data['ingredients']
+        res = self.client.put(f"/api/recette/{data['recette']['id']}/enregistrer/", self.donnees(
+            recette={'titre': 'Crêpes', 'portion': 8, 'typeRecette': self.type.id},
+            # lait passe devant, farine supprimée, œufs ajoutés
+            ingredients=[{'id': lait['id'], 'isSection': False, 'nom': 'lait', 'quantite': '50'}, {'isSection': False, 'nom': 'œufs', 'quantite': '3'}],
+            etapes=[], tags=[], adapteQuantity=True,
+        ), format='json')
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual([(i['nom'], i['noOrdre'], i['quantite']) for i in res.data['ingredients']], [('lait', 0, '100.00'), ('œufs', 1, '6.00')])
+        self.assertEqual((res.data['etapes'], res.data['tags']), ([], []))
+        self.assertFalse(Recette.objects.get(pk=data['recette']['id']).ingredient_set.filter(id=farine['id']).exists())
+
+    def test_tags_null_inchanges(self):
+        data = self.creer()
+        res = self.client.put(f"/api/recette/{data['recette']['id']}/enregistrer/", self.donnees(tags=None), format='json')
+        self.assertEqual(res.data['tags'], [self.tag.id])
+
+    def test_erreur_annule_tout(self):
+        data = self.creer()
+        url = f"/api/recette/{data['recette']['id']}/enregistrer/"
+        # étapes valides, mais tag d'un autre utilisateur : rien ne doit être enregistré
+        res = self.client.put(url, self.donnees(recette={'titre': 'Gaufres'}, etapes=[], tags=[999]), format='json')
+        self.assertEqual(res.status_code, 400)
+        recette = Recette.objects.get(pk=data['recette']['id'])
+        self.assertEqual((recette.titre, recette.preparation_set.count()), ('Crêpes', 1))
+
+    def test_creation_titre_deja_pris_ne_cree_rien(self):
+        self.creer()
+        res = self.client.post('/api/recette/enregistrer/', self.donnees(), format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(Recette.objects.count(), 1)
+
+    def test_ligne_d_une_autre_recette_refusee(self):
+        a = self.creer()
+        b = self.client.post('/api/recette/enregistrer/', self.donnees(recette={'titre': 'Gaufres', 'portion': 2, 'typeRecette': self.type.id}), format='json').data
+        intrus = a['ingredients'][0]['id']
+        res = self.client.put(f"/api/recette/{b['recette']['id']}/enregistrer/",
+                              self.donnees(ingredients=[{'id': intrus, 'isSection': False, 'nom': 'x'}]), format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertTrue(Recette.objects.get(pk=a['recette']['id']).ingredient_set.filter(id=intrus).exists())
+
+    def test_recette_d_un_autre_utilisateur_refusee(self):
+        data = self.creer()
+        autre = APIClient()
+        autre.force_authenticate(User.objects.create_user(email='autre@example.com', password='motdepasse123', is_active=True))
+        res = autre.put(f"/api/recette/{data['recette']['id']}/enregistrer/", self.donnees(), format='json')
+        self.assertEqual(res.status_code, 403)
+
+    def test_multipart_donnees_json(self):
+        import json
+        res = self.client.post('/api/recette/enregistrer/', {'donnees': json.dumps(self.donnees())}, format='multipart')
+        self.assertEqual(res.status_code, 201, res.data)
