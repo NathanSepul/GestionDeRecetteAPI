@@ -41,7 +41,7 @@ def media_disponible():
 
 
 def telecharger_video(url, dossier):
-    """Chemin du fichier vidéo téléchargé (mp4, 720p au plus)."""
+    """Chemin du fichier vidéo téléchargé (mp4, 720 px de large au plus)."""
     import yt_dlp
 
     duree_max = settings.VIDEO_DUREE_MAX
@@ -52,7 +52,9 @@ def telecharger_video(url, dossier):
 
     options = {
         'quiet': True, 'no_warnings': True, 'noplaylist': True, 'noprogress': True, 'socket_timeout': 30,
-        'format': 'best[ext=mp4][height<=720]/best[ext=mp4]/best',
+        # Vidéo verticale : on limite la largeur (la hauteur dépasse toujours 720). H.264 plutôt que H.265 :
+        # plus rapide à décoder ; les images sont de toute façon réduites à 768 px pour Claude
+        'format': 'best[ext=mp4][vcodec^=h264][width<=720]/best[ext=mp4][width<=720]/best[ext=mp4]/best',
         'outtmpl': os.path.join(dossier, 'video.%(ext)s'),
         'max_filesize': TAILLE_MAX_VIDEO,
         'match_filter': trop_longue,
@@ -112,6 +114,8 @@ def images_cles(chemin):
     try:
         with av.open(chemin) as conteneur:
             flux = conteneur.streams.video[0]
+            # décodage sur plusieurs cœurs (~7 fois plus rapide)
+            flux.thread_type = 'AUTO'
             duree = float(flux.duration * flux.time_base) if flux.duration else float(conteneur.duration or 0) / av.time_base
             intervalle = max(INTERVALLE_IMAGES_S, duree / NB_MAX_IMAGES) if duree else INTERVALLE_IMAGES_S
             prochaine = 0.0
