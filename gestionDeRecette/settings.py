@@ -197,6 +197,8 @@ CLAUDE_MODELE = env('CLAUDE_MODELE', default='claude-haiku-5-5')
 ALERTE_EMAIL = env('ALERTE_EMAIL', default='')
 # Analyse de la vidéo quand sa description ne contient pas la recette (recette/import_media.py)
 WHISPER_MODELE = env('WHISPER_MODELE', default='small')
+# Langue des vidéos ; vide = détection automatique (français ou anglais : ~4 s de plus seulement)
+WHISPER_LANGUE = env('WHISPER_LANGUE', default='')
 VIDEO_DUREE_MAX = env.int('VIDEO_DUREE_MAX', default=600)
 
 STATIC_URL = 'static/'

@@ -126,7 +126,7 @@ La recette est mise en forme par l'API Claude, qui lit toujours la description d
   sans télécharger la vidéo (~5 s) ;
 * sinon, ou si la recette obtenue est incomplète (recette dite à l'oral ou écrite à l'écran) : la vidéo est téléchargée,
   la voix transcrite sur le serveur par Whisper (faster-whisper) et une image prise toutes les 2 secondes ;
-  Claude reçoit le tout avec la description. Compter 1 à 2 minutes (surtout la transcription).
+  Claude reçoit le tout avec la description. Compter environ 1 minute (surtout la transcription).
 
 Il faut ``ANTHROPIC_API_KEY`` dans le ``.env`` (sans clé, l'import TikTok est désactivé) : clé sur
 https://console.anthropic.com (crédit prépayé, de l'ordre de 0,05 à 0,2 centime par recette avec Claude Haiku).

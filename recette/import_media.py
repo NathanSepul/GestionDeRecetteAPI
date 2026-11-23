@@ -1,11 +1,12 @@
 """
 Analyse du contenu d'une vidéo, quand sa description ne contient pas la recette (voir import_video.py) :
-- la voix, transcrite sur le serveur par Whisper (faster-whisper, gratuit, ~1 min de calcul par minute de vidéo) ;
+- la voix, transcrite sur le serveur par Whisper (faster-whisper, gratuit, ~40 s de calcul par minute de vidéo) ;
 - le texte affiché à l'écran (quantités souvent incrustées), via une image toutes les 2 secondes, lue ensuite par Claude.
 
 La vidéo est téléchargée dans un dossier temporaire, supprimé à la fin.
 
-Réglages (.env) : WHISPER_MODELE (tiny, base, small... : plus gros = plus juste et plus lent), VIDEO_DUREE_MAX (secondes).
+Réglages (.env) : WHISPER_MODELE (tiny, base, small... : plus gros = plus juste et plus lent), WHISPER_LANGUE
+(vide par défaut = détection automatique), VIDEO_DUREE_MAX (secondes).
 Le modèle Whisper (~500 Mo pour small) est téléchargé au premier usage, puis gardé en mémoire.
 """
 import io
@@ -13,6 +14,7 @@ import logging
 import os
 import tempfile
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 from django.conf import settings
 
@@ -90,7 +92,9 @@ def _whisper():
 def transcrire(chemin):
     """Texte prononcé dans la vidéo ('' si muette ou seulement de la musique)."""
     try:
-        segments, _ = _whisper().transcribe(chemin, vad_filter=True)
+        # beam_size=1 : ~2,5 fois plus rapide que la recherche large par défaut, sans perte visible sur des recettes ;
+        # WHISPER_LANGUE vide : langue détectée (vidéos en français ou en anglais)
+        segments, _ = _whisper().transcribe(chemin, vad_filter=True, beam_size=1, language=settings.WHISPER_LANGUE or None)
         texte = ' '.join(segment.text.strip() for segment in segments)
     except Exception:
         logger.exception("Import vidéo : transcription impossible")
@@ -131,8 +135,11 @@ def analyser_video(url):
     """(transcription, images JPEG) de la vidéo."""
     with tempfile.TemporaryDirectory(prefix='import-video-') as dossier:
         chemin = telecharger_video(url, dossier)
-        images = images_cles(chemin)
-        transcription = transcrire(chemin)
+        # Images extraites pendant la transcription (qui prend l'essentiel du temps)
+        with ThreadPoolExecutor(max_workers=1) as extraction:
+            images = extraction.submit(images_cles, chemin)
+            transcription = transcrire(chemin)
+            images = images.result()
     if not transcription and not images:
         raise ImportRecetteErreur("Impossible de lire le contenu de cette vidéo.")
     return transcription, images
