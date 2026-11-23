@@ -10,9 +10,10 @@ from rest_framework import viewsets, status, generics, permissions
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from gestionDeRecette.api_views import IsOwner
 from gestionDeRecette.utils import reorder
-from recette.import_web import ImportRecetteErreur, importer_recette_depuis_url, sites_import
+from recette.import_web import ImportRecetteErreur, importer_recette_depuis_url, sites_import, titre_libre
 from recette.liste_course import generer_liste_course
 from recette.models import Recette, Ingredient, Preparation, Produit, Unite
 from recette.serializer import (
@@ -22,6 +23,11 @@ from recette.serializer import (
 )
 from typeRecette.models import TypeRecette
 
+
+
+class ImportUrlThrottle(UserRateThrottle):
+    """Compteur par utilisateur (taux 'import_url' dans settings.REST_FRAMEWORK)."""
+    scope = 'import_url'
 
 
 @extend_schema(tags=['Recette'])
@@ -176,7 +182,8 @@ class RecetteViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 new_recette = Recette.objects.create(
                     user=request.user,
-                    titre=source_recette.titre,
+                    # comme l'import depuis un site : "Crêpes (2)" si le titre existe déjà dans ce type
+                    titre=titre_libre(source_recette.titre, type_recette),
                     portion=source_recette.portion,
                     typeRecette=type_recette,
                     conseil=source_recette.conseil,
@@ -196,34 +203,38 @@ class RecetteViewSet(viewsets.ModelViewSet):
                         save=True,
                     )
 
-                # Copie des ingrédients
-                for ingredient in source_recette.ingredient_set.all().order_by('noOrdre'):
-                    Ingredient.objects.create(
+                Ingredient.objects.bulk_create([
+                    Ingredient(
                         recette=new_recette,
                         noOrdre=ingredient.noOrdre,
                         isSection=ingredient.isSection,
                         quantite=ingredient.quantite,
                         nom=ingredient.nom,
-                        unite=ingredient.unite,
-                        produit=ingredient.produit,
+                        unite_id=ingredient.unite_id,
+                        produit_id=ingredient.produit_id,
+                        preparation=ingredient.preparation,
                     )
+                    for ingredient in source_recette.ingredient_set.order_by('noOrdre')
+                ])
 
-                # Copie des préparations
-                for preparation in source_recette.preparation_set.all().order_by('noOrdre'):
-                    Preparation.objects.create(
+                Preparation.objects.bulk_create([
+                    Preparation(
                         recette=new_recette,
                         noOrdre=preparation.noOrdre,
                         isSection=preparation.isSection,
                         description=preparation.description,
                     )
+                    for preparation in source_recette.preparation_set.order_by('noOrdre')
+                ])
 
         except IntegrityError:
+            # deux copies simultanées du même titre : titre_libre ne peut pas l'empêcher à 100 %
             return Response(
                 {"detail": "Une recette avec ce titre existe déjà pour ce type de recette."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        result_serializer = RecetteSerializer(new_recette)
+        result_serializer = RecetteSerializer(new_recette, context={'request': request})
         return Response(result_serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(request=None, responses={200: ImportSiteSerializer(many=True)})
@@ -232,7 +243,9 @@ class RecetteViewSet(viewsets.ModelViewSet):
         """Sites dont on peut importer les recettes (nom, domaine, adresse), pour les lister dans l'interface."""
         return Response(ImportSiteSerializer(sites_import(), many=True).data)
 
-    @action(detail=False, methods=['post'], url_path='import-url', serializer_class=ImportUrlSerializer)
+    # le serveur télécharge la page et la photo : limité pour ne pas servir de relais de téléchargement
+    @action(detail=False, methods=['post'], url_path='import-url', serializer_class=ImportUrlSerializer,
+            throttle_classes=[ImportUrlThrottle])
     def import_url(self, request):
         """Importe une recette depuis un site de cuisine (Marmiton...) dans un type de l'utilisateur."""
         serializer = self.get_serializer(data=request.data)

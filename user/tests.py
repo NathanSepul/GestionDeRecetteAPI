@@ -88,3 +88,43 @@ class CreationDeCompteTests(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn('reset-password-form', mail.outbox[0].body)
+
+
+class ProfilApiTests(TestCase):
+    """Le profil se lit et se modifie, mais ne se crée ni ne se supprime par l'API."""
+
+    def setUp(self):
+        self.chef = user.models.User.objects.create_user(email='chef@example.com', password='motdepasse123', is_active=True)
+        self.client = APIClient()
+        self.client.force_authenticate(self.chef)
+
+    def test_pas_de_creation_par_l_api(self):
+        res = self.client.post('/api/user/profile/', {'first_name': 'Pirate', 'last_name': 'X'}, format='json')
+        self.assertEqual(res.status_code, 405)
+        self.assertEqual(user.models.User.objects.count(), 1)
+
+    def test_pas_de_suppression_par_l_api(self):
+        self.assertEqual(self.client.delete(f'/api/user/profile/{self.chef.id}/').status_code, 405)
+        self.assertTrue(user.models.User.objects.filter(pk=self.chef.pk).exists())
+
+    def test_lecture_et_modification(self):
+        self.assertEqual(self.client.get(f'/api/user/profile/{self.chef.id}/').status_code, 200)
+        res = self.client.patch(f'/api/user/profile/{self.chef.id}/', {'first_name': 'Paul'}, format='json')
+        self.assertEqual(res.status_code, 200, res.data)
+
+
+class ThrottlingTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()  # compteurs partagés avec les autres tests
+
+    def tearDown(self):
+        from django.core.cache import cache
+        cache.clear()
+
+    def test_login_limite(self):
+        client = APIClient()
+        codes = [client.post('/api/login/', {'email': 'x@example.com', 'password': 'faux'}, format='json').status_code
+                 for _ in range(11)]
+        self.assertEqual(codes[:10], [401] * 10)
+        self.assertEqual(codes[10], 429)

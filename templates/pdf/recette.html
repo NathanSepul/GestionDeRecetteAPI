@@ -209,8 +209,8 @@
 	</head>
 	<body>
 		<div class="header">
-			{% if recette.image %}
-			<img class="header-image" src="{{ recette.image.url }}" alt="{{ recette.titre }}" />
+			{% if image_uri %}
+			<img class="header-image" src="{{ image_uri }}" alt="{{ recette.titre }}" />
 			{% endif %}
 			<div class="header-content">
 				<h1>{{ recette.titre }}</h1>

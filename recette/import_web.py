@@ -459,7 +459,7 @@ def _telecharger_image(url):
         return None
 
 
-def _titre_libre(titre, type_recette):
+def titre_libre(titre, type_recette):
     """Un titre est unique par type de recette : "Crêpes" -> "Crêpes (2)" s'il existe déjà."""
     candidat, n = titre, 2
     while Recette.objects.filter(typeRecette=type_recette, titre=candidat).exists():
@@ -482,7 +482,7 @@ def importer_recette_depuis_url(url, user, type_recette, importer_image=True):
     with transaction.atomic():
         recette = Recette.objects.create(
             user=user,
-            titre=_titre_libre(donnees['titre'], type_recette),
+            titre=titre_libre(donnees['titre'], type_recette),
             portion=donnees['portion'],
             typeRecette=type_recette,
             source=url[:500],

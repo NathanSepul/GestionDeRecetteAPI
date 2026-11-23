@@ -184,6 +184,43 @@ class PartageRecettesTests(TestCase):
         self.assertEqual((copie.user, copie.titre, copie.source, copie.tempsPreparation, copie.cout),
                          (self.bob, 'Dan Dan', self.importee.source, 10, 1))
 
+    def test_copie_garde_preparation_et_ordre(self):
+        from recette.models import Ingredient, Preparation
+        Ingredient.objects.create(recette=self.importee, noOrdre=0, isSection=True, nom='Sauce')
+        Ingredient.objects.create(recette=self.importee, noOrdre=1, quantite=2, nom='oignons', preparation='émincés')
+        Preparation.objects.create(recette=self.importee, noOrdre=0, description='Cuire')
+        res = self.en_tant_que(self.bob).post('/api/recette/import/', {'recetteId': self.importee.id, 'typeRecette': self.type_bob.id}, format='json')
+        self.assertEqual(res.status_code, 201, res.data)
+        copie = Recette.objects.get(pk=res.data['id'])
+        self.assertEqual(
+            list(copie.ingredient_set.order_by('noOrdre').values_list('noOrdre', 'isSection', 'nom', 'preparation')),
+            [(0, True, 'Sauce', ''), (1, False, 'oignons', 'émincés')],
+        )
+        self.assertEqual(list(copie.preparation_set.values_list('description', flat=True)), ['Cuire'])
+
+    def test_copie_titre_deja_pris(self):
+        Recette.objects.create(user=self.bob, typeRecette=self.type_bob, titre='Dan Dan', portion=2)
+        res = self.en_tant_que(self.bob).post('/api/recette/import/', {'recetteId': self.importee.id, 'typeRecette': self.type_bob.id}, format='json')
+        self.assertEqual(res.status_code, 201, res.data)
+        self.assertEqual(res.data['titre'], 'Dan Dan (2)')
+
+    def test_pdf_lit_l_image_sur_le_disque(self):
+        import tempfile
+        from io import BytesIO
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.test import override_settings
+        from PIL import Image
+        from recette.views import _image_uri
+
+        with tempfile.TemporaryDirectory() as media, override_settings(MEDIA_ROOT=media):
+            contenu = BytesIO()
+            Image.new('RGB', (10, 10), 'red').save(contenu, 'JPEG')
+            self.importee.image = SimpleUploadedFile('photo.jpg', contenu.getvalue(), content_type='image/jpeg')
+            self.importee.save()
+            uri = _image_uri(self.importee)
+            self.assertTrue(uri.startswith('file://'), uri)
+            self.assertTrue(uri.endswith('.jpg'))
+
     def test_photo_importee_par_defaut(self):
         from recette.serializer import ImportUrlSerializer
         serializer = ImportUrlSerializer(data={'url': 'https://www.marmiton.org/x', 'typeRecette': 1})

@@ -122,6 +122,15 @@ DATABASES = {
     }
 }
 
+# Cache en base : partagé entre les 3 workers Gunicorn (le cache mémoire par défaut est propre à chaque worker,
+# chaque compteur de limitation de requêtes serait alors multiplié par 3). Table créée par : manage.py createcachetable
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'django_cache',
+    }
+}
+
 AUTH_USER_MODEL = 'user.User'
 
 # Password validation
@@ -202,6 +211,16 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',),
 
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+
+    # Limites appliquées aux vues qui déclarent un throttle_scope (ScopedRateThrottle)
+    'DEFAULT_THROTTLE_RATES': {
+        'login': '10/min',
+        'reset_password': '5/hour',
+        'import_url': '30/hour',
+    },
+    # Derrière Nginx, REMOTE_ADDR vaut l'adresse du proxy : l'IP du client est lue dans X-Forwarded-For.
+    # Sans ça, tous les visiteurs partageraient le même compteur.
+    'NUM_PROXIES': None if DEBUG else 1,
 }
 
 SPECTACULAR_SETTINGS = {

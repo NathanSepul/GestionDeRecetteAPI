@@ -1,12 +1,30 @@
+import os
+from pathlib import Path
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.http import HttpResponse
+from django.utils.http import content_disposition_header
 from weasyprint import HTML
 from tag.models import Tag
 from .models import Recette, Ingredient, Preparation
 from rest_framework.decorators import api_view
 from drf_spectacular.utils import extend_schema
 from drf_spectacular.types import OpenApiTypes
+from gestionDeRecette.images import variant_name
+
+
+def _image_uri(recette):
+    """
+    Image lue directement sur le disque (file://) : en prod, /media/ exige d'être connecté
+    et WeasyPrint, qui n'envoie pas le token, recevrait une 401. La variante "medium" suffit et allège le PDF.
+    """
+    if not recette.image:
+        return None
+    chemin = recette.image.path
+    medium = variant_name(chemin, 'medium')
+    if os.path.isfile(medium):
+        chemin = medium
+    return Path(chemin).as_uri() if os.path.isfile(chemin) else None
 
 @extend_schema(
     tags=['Recette'],
@@ -53,6 +71,7 @@ def generer_pdf(request, id):
 
     contexte = {
         "recette": recette,
+        "image_uri": _image_uri(recette),
         "ingredients": ingredients,
         "preparations": preparations_numerotees,
         "tags": tags,
@@ -66,6 +85,6 @@ def generer_pdf(request, id):
     # --- Prod
     pdf = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
     response = HttpResponse(pdf, content_type="application/pdf")
-    filename = f"{recette.titre}.pdf"
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    # gère guillemets et accents dans le titre (filename*=UTF-8...)
+    response["Content-Disposition"] = content_disposition_header(True, f"{recette.titre}.pdf")
     return response

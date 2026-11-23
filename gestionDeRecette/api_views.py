@@ -9,6 +9,7 @@ from rest_framework import permissions
 from django.conf import settings
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import (
@@ -74,6 +75,9 @@ def move_refresh_to_cookie(response):
 
 @extend_schema(tags=['Utilisateur'])
 class MyLogin(TokenObtainPairView):
+    # limite les essais de mot de passe (force brute)
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'
 
     @extend_schema(
         operation_id='Login',
