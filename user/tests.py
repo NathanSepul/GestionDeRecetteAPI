@@ -128,3 +128,14 @@ class ThrottlingTests(TestCase):
                  for _ in range(11)]
         self.assertEqual(codes[:10], [401] * 10)
         self.assertEqual(codes[10], 429)
+
+
+class ValidateursMotDePasseTests(TestCase):
+    def test_codes_d_erreur(self):
+        from django.core.exceptions import ValidationError
+        from gestionDeRecette.validators import LowercaseValidator, UppercaseValidator
+        for validateur, mot_de_passe, code in ((UppercaseValidator(), 'minuscules', 'password_no_upper'),
+                                               (LowercaseValidator(), 'MAJUSCULES', 'password_no_lower')):
+            with self.assertRaises(ValidationError) as erreur:
+                validateur.validate(mot_de_passe)
+            self.assertEqual(erreur.exception.code, code)

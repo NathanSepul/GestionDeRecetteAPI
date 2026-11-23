@@ -1,4 +1,3 @@
-import math
 from rest_framework import pagination, serializers
 from rest_framework.response import Response
 from django.core.paginator import EmptyPage

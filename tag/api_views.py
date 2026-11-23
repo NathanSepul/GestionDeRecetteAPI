@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import permissions
 
 from gestionDeRecette.api_views import IsOwner
+from gestionDeRecette.utils import int_param
 from recette.models import Recette
 from tag.models import Tag
 from tag.serializer import TagSerializer, TagRecetteLinkSerializer
@@ -21,14 +22,12 @@ class TagViewSet(viewsets.ModelViewSet):
         """Filtre les tags par utilisateur et optionnellement par recetteId."""
         queryset = super().get_queryset()
         
-        # queryset = self.queryset.filter(user_id=self.request.user.id)
-        userID = self.request.GET.get('userId')
-        
-        if userID:
+        userID = int_param(self.request, 'userId')
+        if userID is not None:
             queryset = queryset.filter(user_id=userID)
-       
-        recette_id = self.request.query_params.get('recetteId')
-        if recette_id:
+
+        recette_id = int_param(self.request, 'recetteId')
+        if recette_id is not None:
             queryset = queryset.filter(recettes__id=recette_id)
             
         return queryset.order_by('tag')
@@ -40,7 +39,7 @@ class TagViewSet(viewsets.ModelViewSet):
 
     # --- Actions Spécifiques pour les liens Recette <-> Tag ---
 
-    @action(detail=False, methods=['get'], url_path='by_recette/(?P<idRecette>[^/.]+)')
+    @action(detail=False, methods=['get'], url_path=r'by_recette/(?P<idRecette>\d+)')
     def list_by_recette(self, request, idRecette=None):
         """Récupère les tags d'une recette spécifique."""
         tags = Tag.objects.filter(

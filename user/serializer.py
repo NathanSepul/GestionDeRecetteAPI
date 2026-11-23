@@ -1,5 +1,3 @@
-from django.contrib.auth.models import AbstractBaseUser
-from django.contrib.staticfiles.storage import staticfiles_storage
 import user.models
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer

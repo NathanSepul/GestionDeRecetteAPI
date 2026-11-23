@@ -1,8 +1,8 @@
 from .admin import admin
-from gestionDeRecette.api_views import MyLogin, MyTokenRefreshView, MyTokenVerifyView, logout, serve_image
+from gestionDeRecette.api_views import MyLogin, MyTokenRefreshView, MyTokenVerifyView, logout
 from django.conf import settings
 from django.conf.urls.static import static
-from django.urls import path, include, re_path
+from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 api_urlpattern = [
@@ -29,11 +29,8 @@ urlpatterns = [
 
 urlpatterns += api_urlpattern
 
+# En prod, /media/ et /static/ sont servis directement par Nginx (médias publics, noms de fichiers aléatoires)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-else:
-    urlpatterns += [
-        re_path(r'^media/(?P<path>.*)$', serve_image, name='serve_image'),
-    ]
 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

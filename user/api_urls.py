@@ -12,5 +12,4 @@ urlpatterns = [
     path('registration/send-reset-password-link/', api_views.SendResetPasswordLinkView.as_view()),
     path('registration/reset-password/', api_views.ResetPasswordView.as_view()),
     
-    path('', include("django.contrib.auth.urls")),
 ]

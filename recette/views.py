@@ -79,10 +79,7 @@ def generer_pdf(request, id):
 
     html_string = render_to_string("pdf/recette.html", contexte, request=request)
 
-# --- DEBUG 
-    # return HttpResponse(html_string, content_type="text/html")
-
-    # --- Prod
+    # Pour mettre la page au point dans un navigateur : return HttpResponse(html_string, content_type="text/html")
     pdf = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
     response = HttpResponse(pdf, content_type="application/pdf")
     # gère guillemets et accents dans le titre (filename*=UTF-8...)

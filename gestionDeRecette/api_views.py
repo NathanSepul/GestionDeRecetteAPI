@@ -1,8 +1,4 @@
-import mimetypes
-from django.http import HttpResponse
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework import permissions
@@ -36,9 +32,6 @@ class IsOwner(permissions.BasePermission):
         # 3. Si l'objet est lié à un utilisateur (ex: Recette, Commentaire...)
         if hasattr(obj, 'user_id'):
             return obj.user_id == request.user.id
-            
-        if hasattr(obj, 'user'):
-            return obj.user == request.user
 
         # 4. Si l'objet est lié à une recette (ex: IngrédientRecette...)
         if hasattr(obj, 'recette') and hasattr(obj.recette, 'user_id'):
@@ -130,14 +123,3 @@ class MyTokenVerifyView(TokenVerifyView):
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
-
-@api_view(['GET'])
-@authentication_classes([SessionAuthentication, TokenAuthentication, JWTAuthentication])
-@permission_classes([IsAuthenticated])
-def serve_image(request, path):
-    response = HttpResponse()
-    response['X-Accel-Redirect'] = f'/internal-media/{path}'
-    content_type, encoding = mimetypes.guess_type(path)
-    response['Content-Type'] = content_type or 'image/png' 
-
-    return response

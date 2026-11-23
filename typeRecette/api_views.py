@@ -5,7 +5,7 @@ from drf_spectacular.utils import extend_schema
 from django.db import transaction
 from django.db.models import Count, Max
 from gestionDeRecette.api_views import IsOwner
-from gestionDeRecette.utils import reorder
+from gestionDeRecette.utils import int_param, reorder
 from typeRecette.models import TypeRecette
 from typeRecette.serializer import TypeRecetteSerializer, ReorderTypeRecetteSerializer
 
@@ -22,9 +22,8 @@ class TypeRecetteViewSet(viewsets.ModelViewSet):
         """
         queryset = super().get_queryset()
         
-        # queryset = queryset.filter(user_id=self.request.user.id)
-        userID = self.request.GET.get('userId')
-        if userID:
+        userID = int_param(self.request, 'userId')
+        if userID is not None:
             queryset = queryset.filter(user_id=userID)
         
         return queryset.annotate(recipe_count=Count('recette')).order_by('noOrdre')

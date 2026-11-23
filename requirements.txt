@@ -1,13 +1,12 @@
-django==6.0.2
-djangorestframework
-djangorestframework-simplejwt
-django-cors-headers
-PyMySQL
-Pillow
-django-environ
-drf-spectacular
-django-rest-registration
-gunicorn
-django_extensions
-mysqlclient==2.2.7
-weasyprint
+# Versions épinglées : une mise à jour se fait volontairement (pip install -U <paquet>, tests, puis mise à jour ici)
+Django==6.0.2
+djangorestframework==3.17.1
+djangorestframework-simplejwt==5.5.1
+django-cors-headers==4.9.0
+django-environ==0.14.0
+django-rest-registration==0.9.0
+drf-spectacular==0.30.0
+PyMySQL==1.2.0
+Pillow==12.3.0
+weasyprint==69.0
+gunicorn==26.0.0

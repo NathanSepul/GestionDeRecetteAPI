@@ -22,7 +22,7 @@ class LowercaseValidator:
         if not re.search('[a-z]', password):
             raise ValidationError(
                 _("The password must contain at least 1 lowercase letter, a-z."),
-                code='password_no_upper',
+                code='password_no_lower',
             )
 
     def get_help_text(self):

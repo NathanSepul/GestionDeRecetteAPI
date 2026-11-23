@@ -1,12 +1,6 @@
-import base64
-from django.conf import settings
-from rest_framework import  serializers
+from rest_framework import serializers
 
 import recette.models
-from django.db.models import Max
-
-from tag.models import Tag
-from user.serializer import UserSerializer
 from gestionDeRecette.serializer import ImageVariantField
 
 class RecetteSerializer(serializers.ModelSerializer):

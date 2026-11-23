@@ -1,4 +1,3 @@
-from django.conf import settings
 from rest_framework import  serializers
 import typeRecette.models
 from gestionDeRecette.serializer import ImageVariantField

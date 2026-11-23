@@ -18,7 +18,7 @@ def path_and_rename(instance, filename):
 class TypeRecette(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name=_("Utilisateur"))
     noOrdre = models.IntegerField(db_column='noOrdre', blank=True, null=True) 
-    type = models.CharField(max_length=10, blank=False, null=False)
+    type = models.CharField(max_length=50, blank=False, null=False)
     image = models.ImageField(upload_to=path_and_rename, blank=True, null=True)
 
     class Meta:

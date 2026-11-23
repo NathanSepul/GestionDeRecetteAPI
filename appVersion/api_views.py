@@ -1,17 +1,12 @@
 import os
 import appVersion.models
 import appVersion.serializer
-from django import forms
 from django.conf import settings
-from django.http import FileResponse, Http404, HttpResponse
-from django.contrib.auth.decorators import login_required
+from django.http import Http404, HttpResponse
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions
-from rest_framework import status
-from rest_framework.response import Response
-from rest_framework.views import APIView 
-from drf_spectacular.utils import extend_schema
-from drf_spectacular.types import OpenApiTypes
+from rest_framework.views import APIView
 
 class DownloadAPIView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -24,16 +19,14 @@ class DownloadAPIView(APIView):
         filename = f"{settings.APP_NAME}.{support}.zip"
         path_to_file = os.path.join(settings.MEDIA_ROOT, f'uploads/{support}', filename)
 
-        # 2. Vérification de l'existence
         if not os.path.exists(path_to_file):
             raise Http404(f"Le fichier {support} est introuvable.")
 
-        # 3. Préparation de la réponse
         response = HttpResponse()
         response['Content-Type'] = 'application/zip'
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         
-        # 4. Optimisation Nginx (X-Accel-Redirect)
+        # Nginx envoie le fichier lui-même (location /internal-media/), Django ne fait que donner le feu vert
         response['X-Accel-Redirect'] = f'/internal-media/uploads/{support}/{filename}'
         
         return response

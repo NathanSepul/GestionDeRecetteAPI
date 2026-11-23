@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.text import slugify
 from django.db.models import Q
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from gestionDeRecette.utils import register_image_cleanup
 
 def path_and_rename(instance, filename):
@@ -45,7 +45,7 @@ class Recette(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name=_("Utilisateur"))
     titre = models.CharField(max_length=100)
-    portion = models.IntegerField(blank=False, null=False)
+    portion = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     typeRecette = models.ForeignKey(TypeRecette, on_delete=models.CASCADE, verbose_name=_("Type de recette"))
     image = models.ImageField(upload_to=path_and_rename, blank=True, null=True,)
     conseil = models.TextField(blank=True, null=True)

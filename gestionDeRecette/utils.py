@@ -2,9 +2,21 @@ import logging
 import os
 from django.db import transaction
 from django.db.models.signals import post_delete, post_save, pre_save
+from rest_framework.exceptions import ValidationError
 from gestionDeRecette.images import delete_variants, generate_variants
 
 logger = logging.getLogger(__name__)
+
+
+def int_param(request, nom):
+    """Paramètre d'URL entier (?userId=3) ; None s'il est absent, erreur 400 (et non 500) s'il n'est pas entier."""
+    valeur = request.query_params.get(nom, '').strip()
+    if not valeur:
+        return None
+    try:
+        return int(valeur)
+    except ValueError:
+        raise ValidationError({nom: "Entier attendu."})
 
 
 def reorder(obj_to_move, siblings, new_position):

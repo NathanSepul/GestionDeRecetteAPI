@@ -254,3 +254,28 @@ class SitesImportTests(TestCase):
     def test_domaine_invalide(self):
         with self.assertRaises(ValidationError):
             SiteImport(nom='X', domaine='localhost', url='https://example.com').full_clean()
+
+
+class ValidationParametresTests(TestCase):
+    """Paramètres invalides : erreur 400 explicite, jamais d'erreur 500."""
+
+    def setUp(self):
+        self.chef = User.objects.create_user(email='chef@example.com', password='motdepasse123', is_active=True)
+        self.type = TypeRecette.objects.create(user=self.chef, type='Plat')
+        self.client = APIClient()
+        self.client.force_authenticate(self.chef)
+
+    def test_identifiants_non_entiers(self):
+        for url in ('/api/recette/?userId=abc', '/api/recette/?typeRecetteId=abc', '/api/recette/ingredient/?recetteId=abc',
+                    '/api/recette/preparation/?recetteId=abc', '/api/tag/?userId=abc', '/api/tag/?recetteId=x',
+                    '/api/typeRecette/?userId=abc'):
+            self.assertEqual(self.client.get(url).status_code, 400, url)
+
+    def test_portion_au_moins_une(self):
+        res = self.client.post('/api/recette/', {'titre': 'Soupe', 'portion': 0, 'typeRecette': self.type.id}, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('portion', res.data)
+
+    def test_type_de_recette_long(self):
+        res = self.client.post('/api/typeRecette/', {'type': 'Accompagnement'}, format='json')
+        self.assertEqual(res.status_code, 201, res.data)

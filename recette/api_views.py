@@ -12,7 +12,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from gestionDeRecette.api_views import IsOwner
-from gestionDeRecette.utils import reorder
+from gestionDeRecette.utils import int_param, reorder
 from recette.import_web import ImportRecetteErreur, importer_recette_depuis_url, sites_import, titre_libre
 from recette.liste_course import generer_liste_course
 from recette.models import Recette, Ingredient, Preparation, Produit, Unite
@@ -57,17 +57,16 @@ class RecetteViewSet(viewsets.ModelViewSet):
             output_field=IntegerField(),
         ))
 
-        # queryset = queryset.filter(user_id=self.request.user.id)
-        queryparam_UserId = self.request.GET.get('userId', '')
-        queryparam_TypeRecette = self.request.GET.get('typeRecetteId', '')
+        queryparam_UserId = int_param(self.request, 'userId')
+        queryparam_TypeRecette = int_param(self.request, 'typeRecetteId')
         queryparam_OrderBy = self.request.GET.get('orderBy', '')
         queryparam_searchTitre = self.request.GET.get('searchTitre', '')
         queryparam_tag = self.request.GET.get('tags')
         
-        if queryparam_UserId:
+        if queryparam_UserId is not None:
             queryset = queryset.filter(user_id=queryparam_UserId)
-        
-        if queryparam_TypeRecette:
+
+        if queryparam_TypeRecette is not None:
             queryset = queryset.filter(typeRecette=queryparam_TypeRecette)
     
         if queryparam_searchTitre:
@@ -289,9 +288,9 @@ class IngredientViewSet(viewsets.ModelViewSet):
         Sinon renvoie tout (pour l'admin ou debug)
         """
         queryset = self.queryset
-        recette_id = self.request.query_params.get('recetteId') 
-        
-        if recette_id:
+        recette_id = int_param(self.request, 'recetteId')
+
+        if recette_id is not None:
             queryset = queryset.filter(recette_id=recette_id)
         
         return queryset.order_by('noOrdre')
@@ -348,9 +347,9 @@ class PreparationViewSet(viewsets.ModelViewSet):
         Sinon renvoie tout (pour l'admin ou debug)
         """
         queryset = self.queryset
-        recette_id = self.request.query_params.get('recetteId') 
-        
-        if recette_id:
+        recette_id = int_param(self.request, 'recetteId')
+
+        if recette_id is not None:
             queryset = queryset.filter(recette_id=recette_id)
         
         return queryset.order_by('noOrdre')
@@ -399,9 +398,6 @@ class ProduitListAPIView(generics.ListAPIView):
     serializer_class = ProduitSerializer
     paginator = None
 
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
-
     def get_queryset(self):
         queryset = super().get_queryset()
         queryparam_produit = self.request.GET.get('searchProduit', '')
@@ -431,9 +427,6 @@ class UniteListAPIView(generics.ListAPIView):
     queryset = Unite.objects.all()
     serializer_class = UniteSerializer
     paginator = None
-
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
 
     def get_queryset(self):
         queryset = super().get_queryset()

@@ -19,6 +19,3 @@ class CustomEmailBackend(EmailBackend):
                 message.bcc = []
 
         return super(CustomEmailBackend, self).send_messages(messages)
-
-# from django.core.mail import send_mail
-# send_mail("subject", "body",  None, ["sepul.nathan@gmail.com"], fail_silently=False,)
