@@ -16,7 +16,7 @@ from django.core.exceptions import ValidationError
 
 from recette import import_ia, import_video
 from recette.import_ia import ClaudeIndisponible
-from recette.models import AppelIA, EtatClaude, ImportVideo, Produit, Recette, SiteImport, Unite, formater_duree
+from recette.models import AppelIA, EtatClaude, Equivalence, Ingredient, ImportVideo, Synonyme, Produit, Recette, SiteImport, Unite, formater_duree
 from typeRecette.models import TypeRecette
 from user.models import User
 
@@ -664,3 +664,56 @@ class SurveillanceClaudeTests(TestCase):
         with self.assertRaises(ClaudeIndisponible):
             import_ia.structurer_avec_claude('Crêpes', 'description')
         self.assertFalse(EtatClaude.objects.exists())
+
+
+class ReferentielProduitsTests(TestCase):
+    """Synonymes, produits à vérifier, recherche, déterminant, ingrédients sans produit (admin)."""
+
+    def setUp(self):
+        self.oignon = Produit.objects.create(nom='oignon', nomPluriel='oignons')
+        self.poireau = Produit.objects.create(nom='poireau', nomPluriel='poireaux')
+        Synonyme.objects.create(texte='poireau émincé surgelé', produit=self.poireau)
+        Produit.objects.create(nom='topinambour', statut=Produit.Statut.A_VERIFIER, source=Produit.Source.IA)
+        self.user = User.objects.create_superuser(email='admin@example.com', password='motdepasse123')
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_reconnaissance(self):
+        analyseur = AnalyseurIngredients()
+        self.assertEqual(analyseur.analyser('2 gros oignons émincés')[2:], (self.oignon, None, 'gros, émincés'))
+        self.assertEqual(analyseur.analyser('1 Poireau émincé surgelé')[2], self.poireau)
+        # produit à vérifier : pas encore utilisé
+        self.assertEqual(analyseur.analyser('2 topinambours')[2:4], (None, 'topinambours'))
+
+    def test_recherche_par_synonyme_et_validation(self):
+        noms = lambda q: [p['nom'] for p in self.client.get('/api/recette/produit/', {'searchProduit': q}).data]
+        self.assertEqual(noms('surgelé'), ['poireau'])
+        self.assertEqual(noms('topinam'), [])
+
+    def test_determinant_et_pluriel_automatiques(self):
+        self.assertEqual((Produit.objects.create(nom='échalote').determinant, Produit.objects.create(nom='sel').determinant), ("d'", 'de'))
+        self.assertEqual(Produit.objects.create(nom='riz').nomPluriel, 'riz')
+        self.assertEqual(Produit.objects.create(nom='haricot', determinant='de').determinant, 'de')  # h aspiré corrigé à la main
+
+    def test_ingredient_sans_produit_associe_et_appris(self):
+        type_recette = TypeRecette.objects.create(user=self.user, type='Plat')
+        recette = Recette.objects.create(user=self.user, typeRecette=type_recette, titre='Soupe', portion=2)
+        ingredient = Ingredient.objects.create(recette=recette, noOrdre=0, quantite=2, nom='Poireaux bio')
+        self.client.force_login(self.user)
+        page = self.client.get('/admin/recette/ingredientsansproduit/')
+        self.assertContains(page, 'Poireaux bio')
+        reponse = self.client.post('/admin/recette/ingredientsansproduit/', {
+            'form-TOTAL_FORMS': 1, 'form-INITIAL_FORMS': 1, 'form-0-id': ingredient.id, 'form-0-produit': self.poireau.id, '_save': 'Enregistrer',
+        })
+        self.assertEqual(reponse.status_code, 302)
+        ingredient.refresh_from_db()
+        self.assertEqual((ingredient.produit, ingredient.nom, ingredient.quantite), (self.poireau, 'Poireaux bio', 2))
+        self.assertEqual(Synonyme.objects.get(cle='poireaux bio').produit, self.poireau)
+        self.assertEqual(AnalyseurIngredients().analyser('3 poireaux bio')[2], self.poireau)
+
+    def test_pages_admin(self):
+        self.client.force_login(self.user)
+        Equivalence.objects.create(produit=self.oignon, quantite=1, quantiteCible=150, uniteCible=Unite.objects.get_or_create(
+            code='g', defaults={'description': 'gramme', 'dimension': 'masse', 'facteur': 1})[0])
+        for url in ('/admin/recette/produit/', f'/admin/recette/produit/{self.oignon.id}/change/', '/admin/recette/produit/?statut__exact=a_verifier'):
+            self.assertEqual(self.client.get(url).status_code, 200, url)

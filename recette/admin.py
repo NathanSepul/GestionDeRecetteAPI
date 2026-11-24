@@ -3,10 +3,21 @@ from django.db.models import Count, Sum
 from django.utils import timezone
 import recette.models
 
-class ProduitMesureInline(admin.TabularInline):
-    model = recette.models.ProduitMesure
-    extra = 0
-    verbose_name_plural = "Mesures propres au produit (ex. 1 gousse = 5 g)"
+class SynonymeInline(admin.TabularInline):
+    model = recette.models.Synonyme
+    extra = 1
+    fields = ('texte',)
+    verbose_name_plural = "Synonymes : autres façons de l'écrire (« poireaux », « petit poireau »…)"
+
+
+class EquivalenceInline(admin.TabularInline):
+    model = recette.models.Equivalence
+    fk_name = 'produit'
+    extra = 1
+    fields = ('quantite', 'unite', 'quantiteCible', 'uniteCible', 'produitCible')
+    autocomplete_fields = ('produitCible',)
+    verbose_name_plural = ("Équivalences : 1 ml = 1,4 g (densité) · 1 (pièce) = 150 g · 1 gousse = 5 g · "
+                           "40 ml = 1 (pièce) de citron (dérivé → produit de base). Unité vide = pièce")
 
 
 @admin.register(recette.models.SiteImport)
@@ -19,27 +30,67 @@ class SiteImportAdmin(admin.ModelAdmin):
 
 @admin.register(recette.models.Produit)
 class ProduitAdmin(admin.ModelAdmin):
-    list_display = ( 'nom','nomPluriel','rayon', 'placard', 'uniteAchat', 'densite', 'poidsPiece', 'produitDeBase', 'ratio_texte')
-    list_editable = ('rayon', 'placard', 'uniteAchat', 'densite', 'poidsPiece')
-    list_filter = ('rayon', 'placard', 'uniteAchat')
-    inlines = [ProduitMesureInline]
-    readonly_fields =[ 'id', 'ratio_texte']
-    list_per_page = 20
-    search_fields = ('nom',)
+    list_display = ('nom', 'nomPluriel', 'rayon', 'placard', 'uniteAchat', 'produitDeBase', 'nb_equivalences', 'statut', 'source')
+    list_editable = ('rayon', 'placard', 'uniteAchat', 'statut')
+    list_filter = ('statut', 'source', 'rayon', 'placard', 'uniteAchat')
+    inlines = [SynonymeInline, EquivalenceInline]
+    readonly_fields = ['id']
+    list_per_page = 50
+    search_fields = ('nom', 'synonymes__texte')
     ordering = ('nom',)
-    raw_id_fields = ('produitDeBase',)
+    autocomplete_fields = ('produitDeBase',)
+    actions = ['valider']
     fieldsets = (
-        (None, {'fields': ('id', 'nom', 'nomPluriel', 'determinant', 'rayon', 'placard')}),
-        ('Conversions', {
-            'fields': ('uniteAchat', 'densite', 'poidsPiece'),
-            'description': "Unité d'achat : g, ml, pièce ou une mesure (gousse...). "
-                           "Densité : 1 cs de sucre (15 ml) = 15 g -> 1. Poids d'une pièce : 1 oignon = 150 g.",
-        }),
-        ('Produit de base', {
-            'fields': ('produitDeBase', ('ratioQuantiteBase', 'ratioUniteBase'), ('ratioQuantite', 'ratioUnite'), 'ratio_texte'),
-            'description': "Ex. 1 gousse d'ail = 1 cc d'ail haché. Sans ratio : 1 pour 1, dans la même unité.",
+        (None, {'fields': ('id', 'nom', 'nomPluriel', 'determinant', 'rayon', 'placard', ('statut', 'source'))}),
+        ('Achat', {
+            'fields': ('uniteAchat', 'produitDeBase'),
+            'description': "Unité d'achat : celle de la liste de courses (g, ml, pièce, gousse…). "
+                           "Produit de base : ce qu'on achète pour un dérivé (jus de citron → citron).",
         }),
     )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(nb_eq=Count('equivalences', distinct=True))
+
+    @admin.display(description="Équivalences", ordering='nb_eq')
+    def nb_equivalences(self, obj):
+        return obj.nb_eq or ''
+
+    @admin.action(description="Valider les produits sélectionnés")
+    def valider(self, request, queryset):
+        n = queryset.update(statut=recette.models.Produit.Statut.VALIDE)
+        self.message_user(request, f"{n} produit(s) validé(s).")
+
+
+@admin.register(recette.models.IngredientSansProduit)
+class IngredientSansProduitAdmin(admin.ModelAdmin):
+    """
+    Lignes de recettes dont l'ingrédient n'est pas reconnu : choisir le produit dans la liste et enregistrer.
+    Le texte devient aussi un synonyme du produit, pour que les prochains imports le reconnaissent.
+    """
+    list_display = ('nom', 'quantite', 'unite', 'recette', 'produit')
+    list_editable = ('produit',)
+    autocomplete_fields = ('produit',)
+    search_fields = ('nom', 'recette__titre')
+    list_per_page = 50
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(isSection=False, produit__isnull=True).select_related('recette', 'unite')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        texte = (obj.nom or '').strip()
+        if obj.produit_id and texte and len(texte) <= 200:
+            cle = recette.models.normaliser_nom(texte)
+            if cle != recette.models.normaliser_nom(obj.produit.nom) and not recette.models.Synonyme.objects.filter(cle=cle).exists():
+                recette.models.Synonyme.objects.create(texte=texte, produit=obj.produit)
+
 
 @admin.register(recette.models.Rayon)
 class RayonAdmin(admin.ModelAdmin):

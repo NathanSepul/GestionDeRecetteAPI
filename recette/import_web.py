@@ -17,7 +17,6 @@ import json
 import logging
 import re
 import socket
-import unicodedata
 import urllib.request
 from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
@@ -28,7 +27,9 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from PIL import Image
 
-from recette.models import DUREE_MAX_MINUTES, Ingredient, Preparation, Produit, Recette, SiteImport, Unite
+from recette.models import (
+    DUREE_MAX_MINUTES, Ingredient, Preparation, Produit, Recette, SiteImport, Synonyme, Unite, normaliser_nom,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -289,11 +290,8 @@ def extraire_recette(page_html):
 
 # ---------- Analyse des ingrédients ----------
 
-def normaliser(texte):
-    """'Cuillères à soupe d’Œufs' -> "cuilleres a soupe d'oeufs" (comparaisons sans accents ni majuscules)."""
-    texte = (texte or '').lower().replace('œ', 'oe').replace('æ', 'ae').replace('’', "'")
-    texte = ''.join(c for c in unicodedata.normalize('NFD', texte) if unicodedata.category(c) != 'Mn')
-    return re.sub(r'\s+', ' ', texte).strip()
+# 'Cuillères à soupe d’Œufs' -> "cuilleres a soupe d'oeufs" (comparaisons sans accents ni majuscules)
+normaliser = normaliser_nom
 
 
 # Façons courantes d'écrire une même unité : rapprochées des unités en base via leur code, pluriel ou description
@@ -333,6 +331,9 @@ RE_PREPARATION = re.compile(
     r"(?:,\s*|\s)((?:hache|emince|rape|cisele|pele|presse|epluche|trempe|ramolli|fondu|coupe)(?:e|s|es)?"
     r"(?: finement| en des| en rondelles| en lamelles| en morceaux)?|mous?|molles?|en des|en rondelles|en lamelles)$"
 )
+# taille en tête (texte normalisé) : "2 gros oignons" -> produit "oignon" + préparation "gros" ;
+# essayé seulement si le nom complet n'est pas un produit ("petit pois" reste "petit pois")
+RE_TAILLE = re.compile(r"^(petite?s?|grosse?s?|gros|grande?s?|moyenne?s?|moyens?|belles?|beaux|beau|bel)\s+")
 
 
 def _quantite(texte):
@@ -372,11 +373,14 @@ class AnalyseurIngredients:
         # les plus longs d'abord : "cuillere a soupe" avant "c"
         self.alias_unites = sorted(self.unites, key=len, reverse=True)
 
-        self.produits = {}  # nom ou pluriel normalisé -> Produit
-        for produit in Produit.objects.only('id', 'nom', 'nomPluriel'):
+        # nom, pluriel ou synonyme normalisé -> Produit ; produits validés seulement (pas ceux "à vérifier")
+        self.produits = {}
+        for produit in Produit.objects.filter(statut=Produit.Statut.VALIDE).only('id', 'nom', 'nomPluriel'):
             for nom in (produit.nom, produit.nomPluriel):
                 if nom:
                     self.produits.setdefault(normaliser(nom), produit)
+        for synonyme in Synonyme.objects.filter(produit__statut=Produit.Statut.VALIDE).select_related('produit'):
+            self.produits.setdefault(synonyme.cle, synonyme.produit)
 
     def _unite(self, texte):
         for alias in self.alias_unites:
@@ -431,6 +435,14 @@ class AnalyseurIngredients:
         produit = self._produit(texte_produit)
         if produit:
             return produit, ''
+        # "gros oignons émincés" : la taille en tête rejoint la préparation
+        taille = RE_TAILLE.match(texte_produit)
+        if taille:
+            mot_taille = ligne.split()[-len(texte_produit.split())] if len(ligne.split()) >= len(texte_produit.split()) else taille.group(1)
+            produit, preparation = self._produit_preparation(texte_produit[taille.end():], ligne)
+            if produit:
+                return produit, ', '.join(p for p in (mot_taille, preparation) if p)[:50]
+            return None, ''
         # "oignons émincés", "beurre, fondu" : le produit sans sa préparation
         trouve = RE_PREPARATION.search(texte_produit)
         produit = self._produit(texte_produit[:trouve.start()].rstrip(' ,')) if trouve else None

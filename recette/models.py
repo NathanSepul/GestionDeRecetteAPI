@@ -1,5 +1,6 @@
 import os
 import re
+import unicodedata
 import uuid
 from django.db import models
 from typeRecette.models import TypeRecette
@@ -114,16 +115,22 @@ class Produit(models.Model):
     placard = models.BooleanField(default=False)
     nomPluriel =  models.TextField()
     produitDeBase = models.ForeignKey('self', on_delete=models.PROTECT, verbose_name=_("Produit de base"),blank=True,null=True)
+    # "de" / "d'" : rempli automatiquement si vide (voir determinant_pour) ; à corriger à la main pour un h aspiré
     determinant =  models.CharField(max_length=5, blank=True, null=True)
-    # ratio avec le produit de base : "1 gousse (d'ail) = 1 cc (d'ail haché)", "1 (citron) = 40 ml (de jus)".
-    # Unité vide = sans unité (pièce). Sans ratio : 1 pour 1, dans la même unité.
-    ratioQuantiteBase = models.DecimalField(_("Quantité de base"), max_digits=9, decimal_places=2, blank=True, null=True)
-    ratioUniteBase = models.ForeignKey('Unite', on_delete=models.PROTECT, verbose_name=_("Unité de base"), blank=True, null=True, related_name='+')
-    ratioQuantite = models.DecimalField(_("= quantité de ce produit"), max_digits=9, decimal_places=2, blank=True, null=True)
-    ratioUnite = models.ForeignKey('Unite', on_delete=models.PROTECT, verbose_name=_("Unité de ce produit"), blank=True, null=True, related_name='+')
-    # propriétés physiques : convertir volume <-> poids <-> pièces ("1 cs de sucre" -> 15 g, "1 oignon" -> 150 g)
-    densite = models.DecimalField(_("Densité (g/ml)"), max_digits=7, decimal_places=3, blank=True, null=True)
-    poidsPiece = models.DecimalField(_("Poids d'une pièce (g)"), max_digits=9, decimal_places=2, blank=True, null=True)
+
+    class Statut(models.TextChoices):
+        VALIDE = 'valide', _("Validé")
+        A_VERIFIER = 'a_verifier', _("À vérifier")
+
+    class Source(models.TextChoices):
+        MANUEL = 'manuel', _("Saisi à la main")
+        OPEN_FOOD_FACTS = 'openfoodfacts', _("Open Food Facts")
+        IA = 'ia', _("Proposé par l'IA")
+
+    # seuls les produits validés servent à reconnaître les ingrédients et sont proposés dans l'application
+    statut = models.CharField(max_length=10, choices=Statut.choices, default=Statut.VALIDE, db_index=True)
+    source = models.CharField(max_length=15, choices=Source.choices, default=Source.MANUEL)
+    # conversions (densité, poids d'une pièce, gousse, dérivé -> produit de base) : voir Equivalence
     # unité dans laquelle la liste de courses exprime le total : g (poids), ml (volume), pièce, gousse...
     # Vide : pas de conversion entre familles d'unités, chaque famille reste sur sa ligne.
     uniteAchat = models.ForeignKey('Unite', on_delete=models.PROTECT, verbose_name=_("Unité d'achat"), blank=True, null=True, related_name='+')
@@ -132,34 +139,17 @@ class Produit(models.Model):
         db_table = 'produit'
         verbose_name = "produit"
         verbose_name_plural = "produits"
-        constraints = [
-            models.CheckConstraint(
-                condition=(
-                    Q(ratioQuantiteBase__isnull=True, ratioQuantite__isnull=True)
-                    | Q(ratioQuantiteBase__gt=0, ratioQuantite__gt=0)
-                ),
-                name="produit_ratio_complet",
-            ),
-        ]
 
     def __str__(self):
         return self.nom
 
-    def ratio_texte(self):
-        if self.ratioQuantiteBase is None or not self.produitDeBase_id:
-            return ""
-        base = f"{self.ratioQuantiteBase.normalize():f} {self.ratioUniteBase or ''}".strip()
-        derive = f"{self.ratioQuantite.normalize():f} {self.ratioUnite or ''}".strip()
-        return f"{base} {self.produitDeBase} = {derive} {self.nom}"
+    def save(self, *args, **kwargs):
+        if not self.determinant:
+            self.determinant = determinant_pour(self.nom)
+        if not self.nomPluriel:
+            self.nomPluriel = self.nom
+        super().save(*args, **kwargs)
 
-    ratio_texte.short_description = 'Ratio'
-
-    def clean(self):
-        super().clean()
-        if (self.ratioQuantiteBase is None) != (self.ratioQuantite is None):
-            raise ValidationError(_("Le ratio demande les deux quantités (base et produit)."))
-        if self.ratioQuantiteBase is not None and not self.produitDeBase_id:
-            raise ValidationError({"produitDeBase": _("Un ratio n'a de sens qu'avec un produit de base.")})
 
 class Unite(models.Model):
     class Dimension(models.TextChoices):
@@ -167,7 +157,7 @@ class Unite(models.Model):
         VOLUME = 'volume', _("Volume (base : ml)")
         PIECE = 'piece', _("Pièce")
         LONGUEUR = 'longueur', _("Longueur (base : cm)")
-        # gousse, botte, tranche... : leur valeur dépend du produit (ProduitMesure)
+        # gousse, botte, tranche... : leur valeur dépend du produit (équivalences du produit)
         VAGUE = 'vague', _("Mesure propre au produit (gousse, botte...)")
 
     code = models.CharField(max_length=10)
@@ -216,23 +206,78 @@ class Unite(models.Model):
             )
 
 
-class ProduitMesure(models.Model):
-    """Valeur d'une mesure propre au produit : "ail · 1 gousse = 5 g", "poireau · 1 botte = 3 (pièces)"."""
-    produit = models.ForeignKey(Produit, on_delete=models.CASCADE, related_name='mesures')
-    unite = models.ForeignKey(Unite, on_delete=models.PROTECT, related_name='+', limit_choices_to={'dimension': 'vague'})
-    quantite = models.DecimalField(max_digits=9, decimal_places=2)
-    # unité de la quantité ci-dessus (g, ml, cm...) ; vide = pièces
-    uniteReference = models.ForeignKey(Unite, on_delete=models.PROTECT, related_name='+', blank=True, null=True,
-                                       limit_choices_to=~Q(dimension='vague'))
+def determinant_pour(nom):
+    """"d'" devant une voyelle ou un h (muet le plus souvent : "d'herbes"), "de" sinon ("de yaourt", "de sel")."""
+    initiale = unicodedata.normalize('NFD', (nom or '').strip().lower())[:1]
+    return "d'" if initiale and initiale in 'aeiouœh' else 'de'
+
+
+class Synonyme(models.Model):
+    """Autre façon d'écrire un produit : "poireaux", "petit poireau", "gousse d'ail"... (reconnaissance des ingrédients)."""
+    texte = models.CharField(max_length=200)
+    # texte normalisé (sans accents ni majuscules) : unique, c'est lui qui sert à la recherche
+    cle = models.CharField(max_length=200, unique=True, editable=False)
+    produit = models.ForeignKey(Produit, on_delete=models.CASCADE, related_name='synonymes')
 
     class Meta:
-        db_table = 'produit_mesure'
-        verbose_name = "mesure du produit"
-        verbose_name_plural = "mesures du produit"
-        constraints = [models.UniqueConstraint(fields=['produit', 'unite'], name='UniciteMesureParProduit')]
+        db_table = 'synonyme'
+        verbose_name = "synonyme"
+        verbose_name_plural = "synonymes"
+        ordering = ['texte']
 
     def __str__(self):
-        return f"1 {self.unite} de {self.produit} = {self.quantite.normalize():f} {self.uniteReference or 'pièce(s)'}"
+        return f"{self.texte} → {self.produit}"
+
+    def save(self, *args, **kwargs):
+        self.cle = normaliser_nom(self.texte)
+        super().save(*args, **kwargs)
+
+
+def normaliser_nom(texte):
+    """'Poireaux  Émincés' -> 'poireaux emincés' sans accents : clé de comparaison des noms de produits."""
+    texte = (texte or '').lower().replace('œ', 'oe').replace('æ', 'ae').replace('’', "'")
+    texte = ''.join(c for c in unicodedata.normalize('NFD', texte) if unicodedata.category(c) != 'Mn')
+    return re.sub(r'\s+', ' ', texte).strip()
+
+
+class Equivalence(models.Model):
+    """
+    Conversion d'un produit : "quantite unite de produit = quantiteCible uniteCible de produitCible".
+    Sans produit cible : le même produit. Unité vide : pièces.
+      1 ml de miel = 1,4 g           (densité)
+      1 oignon = 150 g               (poids d'une pièce)
+      1 gousse d'ail = 5 g           (mesure propre au produit)
+      1 botte de poireau = 3 (pièces)
+      40 ml de jus de citron = 1 citron   (dérivé -> produit de base : ce qu'on achète)
+    La liste de courses enchaîne ces équivalences pour exprimer chaque ingrédient dans l'unité d'achat.
+    """
+    produit = models.ForeignKey(Produit, on_delete=models.CASCADE, related_name='equivalences')
+    quantite = models.DecimalField(max_digits=9, decimal_places=3, default=1)
+    unite = models.ForeignKey('Unite', on_delete=models.PROTECT, blank=True, null=True, related_name='+')
+    quantiteCible = models.DecimalField(_("= quantité"), max_digits=9, decimal_places=3)
+    uniteCible = models.ForeignKey('Unite', on_delete=models.PROTECT, blank=True, null=True, related_name='+', verbose_name=_("unité"))
+    produitCible = models.ForeignKey(Produit, on_delete=models.CASCADE, blank=True, null=True, related_name='+',
+                                     verbose_name=_("de (autre produit)"))
+
+    class Meta:
+        db_table = 'equivalence'
+        verbose_name = "équivalence"
+        verbose_name_plural = "équivalences"
+        constraints = [
+            models.CheckConstraint(condition=Q(quantite__gt=0, quantiteCible__gt=0), name='equivalence_quantites_positives'),
+        ]
+
+    def __str__(self):
+        def terme(quantite, unite, produit):
+            return f"{quantite.normalize():f} {unite or ''} {produit}".replace('  ', ' ')
+        return f"{terme(self.quantite, self.unite, self.produit)} = {terme(self.quantiteCible, self.uniteCible, self.produitCible or self.produit)}"
+
+    def clean(self):
+        super().clean()
+        if self.produitCible_id and self.produitCible_id == self.produit_id:
+            raise ValidationError({"produitCible": _("Laisser vide pour une équivalence du même produit.")})
+        if not self.produitCible_id and self.unite_id == self.uniteCible_id:
+            raise ValidationError(_("Les deux unités doivent être différentes."))
 
 
 class Ingredient(models.Model):
@@ -253,6 +298,14 @@ class Ingredient(models.Model):
     
     
     
+
+class IngredientSansProduit(Ingredient):
+    """Lignes de recettes non rattachées à un produit (écran de l'admin pour les associer)."""
+    class Meta:
+        proxy = True
+        verbose_name = "ingrédient sans produit"
+        verbose_name_plural = "ingrédients sans produit"
+
 
 class Preparation(models.Model):
     recette = models.ForeignKey(Recette, on_delete=models.CASCADE, verbose_name=_("Recette"))

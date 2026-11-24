@@ -3,7 +3,7 @@ import json
 import os
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from django.db.models import Case, F, IntegerField, Max, Value, When
+from django.db.models import Case, F, IntegerField, Max, Q, Value, When
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
@@ -538,14 +538,17 @@ class ProduitListAPIView(generics.ListAPIView):
     paginator = None
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        # produits "à vérifier" (import massif) : pas proposés tant qu'ils ne sont pas validés dans l'admin
+        queryset = super().get_queryset().filter(statut=Produit.Statut.VALIDE)
         queryparam_produit = self.request.GET.get('searchProduit', '')
         
         if not queryparam_produit:
             return queryset.order_by('nom')
 
-        # Les produits qui commencent par la recherche avant ceux qui la contiennent ailleurs
-        queryset = queryset.filter(nom__icontains=queryparam_produit).annotate(
+        # Nom ou synonyme ("poireaux" trouve "poireau") ; ceux qui commencent par la recherche d'abord
+        queryset = queryset.filter(
+            Q(nom__icontains=queryparam_produit) | Q(synonymes__texte__icontains=queryparam_produit)
+        ).distinct().annotate(
             pertinence=Case(When(nom__istartswith=queryparam_produit, then=0), default=1, output_field=IntegerField())
         ).order_by('pertinence', 'nom')
 
