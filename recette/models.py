@@ -355,3 +355,43 @@ class EtatClaude(models.Model):
     @classmethod
     def obtenir(cls):
         return cls.objects.get_or_create(pk=1)[0]
+
+
+class AppelIA(models.Model):
+    """Journal des appels à l'API Claude : ce qui est envoyé, ce qui revient, et ce que ça coûte."""
+    class Etape(models.TextChoices):
+        DESCRIPTION = 'description', _("Description seule")
+        VIDEO = 'video', _("Vidéo (voix et images)")
+        VERIFICATION = 'verification', _("Vérification (admin)")
+
+    class Statut(models.TextChoices):
+        SUCCES = 'succes', _("Succès")
+        ERREUR = 'erreur', _("Erreur")
+
+    date = models.DateTimeField(auto_now_add=True, db_index=True)
+    etape = models.CharField(max_length=15, choices=Etape.choices)
+    importVideo = models.ForeignKey(ImportVideo, on_delete=models.SET_NULL, blank=True, null=True, related_name='appelsIA',
+                                    verbose_name=_("Import vidéo"))
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, verbose_name=_("Utilisateur"))
+    modele = models.CharField(max_length=50)
+    nbImages = models.PositiveSmallIntegerField(default=0)
+    tokensEntree = models.PositiveIntegerField(default=0)
+    tokensSortie = models.PositiveIntegerField(default=0)
+    # en dollars ; vide si le tarif du modèle est inconnu (voir TARIFS dans import_ia.py)
+    cout = models.DecimalField(max_digits=10, decimal_places=6, blank=True, null=True)
+    dureeMs = models.PositiveIntegerField(default=0)
+    statut = models.CharField(max_length=10, choices=Statut.choices)
+    stopReason = models.CharField(max_length=30, blank=True, default='')
+    erreur = models.TextField(blank=True, default='')
+    # texte envoyé (sans les images) et réponse reçue
+    entree = models.TextField(blank=True, default='')
+    reponse = models.TextField(blank=True, default='')
+
+    class Meta:
+        db_table = 'appel_ia'
+        verbose_name = "appel à l'IA"
+        verbose_name_plural = "appels à l'IA"
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{self.get_etape_display()} du {self.date:%d/%m/%Y %H:%M}"

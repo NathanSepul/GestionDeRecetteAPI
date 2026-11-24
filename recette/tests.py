@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from decimal import Decimal
 from unittest.mock import Mock, patch
 
 import anthropic
@@ -15,7 +16,7 @@ from django.core.exceptions import ValidationError
 
 from recette import import_ia, import_video
 from recette.import_ia import ClaudeIndisponible
-from recette.models import EtatClaude, ImportVideo, Produit, Recette, SiteImport, Unite, formater_duree
+from recette.models import AppelIA, EtatClaude, ImportVideo, Produit, Recette, SiteImport, Unite, formater_duree
 from typeRecette.models import TypeRecette
 from user.models import User
 
@@ -540,8 +541,9 @@ def _erreur_api(classe, status):
     return classe(f"erreur {status}", response=reponse, body=None)
 
 
-def _reponse_ia(contenu):
-    return Mock(stop_reason='end_turn', content=[Mock(type='text', text=json.dumps(contenu))])
+def _reponse_ia(contenu, tokens_entree=20_000, tokens_sortie=1_000, modele='claude-haiku-5-5'):
+    return Mock(stop_reason='end_turn', model=modele, content=[Mock(type='text', text=json.dumps(contenu))],
+                usage=Mock(input_tokens=tokens_entree, output_tokens=tokens_sortie))
 
 
 @override_settings(ANTHROPIC_API_KEY='cle-de-test', ALERTE_EMAIL='admin@example.com')
@@ -619,6 +621,43 @@ class SurveillanceClaudeTests(TestCase):
         self.assertEqual([bloc['type'] for bloc in contenu], ['image', 'image', 'text'])
         self.assertEqual(contenu[0]['source']['data'], 'aW1hZ2Ux')
         self.assertIn('<transcription>\nil te faut\n</transcription>', contenu[2]['text'])
+
+    def test_journal_succes_avec_cout(self):
+        tache = ImportVideo.objects.create(user=User.objects.create_user(email='j@example.com', password='motdepasse123', is_active=True),
+                                           url='https://www.tiktok.com/@a/video/1', typeRecette=TypeRecette.objects.create(
+                                               user=User.objects.get(email='j@example.com'), type='Plat'))
+        with patch('recette.import_ia._client') as client:
+            client.return_value.messages.create.return_value = _reponse_ia({'titre': 'Crêpes'})
+            import_ia.structurer_avec_claude('Crêpes', 'la description', 'la voix', [b'i1', b'i2'], tache=tache)
+        appel = AppelIA.objects.get()
+        self.assertEqual((appel.etape, appel.importVideo, appel.user, appel.nbImages, appel.statut), ('video', tache, tache.user, 2, 'succes'))
+        # 20 000 x 0,10 $ + 1 000 x 0,50 $ par million = 0,0025 $
+        self.assertEqual((appel.tokensEntree, appel.tokensSortie, appel.cout), (20_000, 1_000, Decimal('0.0025')))
+        self.assertIn('<transcription>\nla voix', appel.entree)
+        self.assertEqual(json.loads(appel.reponse), {'titre': 'Crêpes'})
+
+    def test_journal_erreur_sans_cout(self):
+        with self.assertRaises(ClaudeIndisponible):
+            self.structurer(_erreur_api(anthropic.PaymentRequiredError, 402))
+        appel = AppelIA.objects.get()
+        self.assertEqual((appel.etape, appel.statut, appel.cout), ('description', 'erreur', 0))
+        self.assertIn('402', appel.erreur)
+
+    def test_cout(self):
+        self.assertEqual(import_ia._cout('claude-sonnet-5-5', 1_000_000, 100_000), Decimal('3'))
+        self.assertEqual(import_ia._cout('claude-haiku-5-5', 200_000, 0), Decimal('0.1'))  # tarif long contexte
+        self.assertIsNone(import_ia._cout('modele-inconnu', 1000, 1000))
+
+    def test_admin_totaux(self):
+        self.structurer(_reponse_ia({}))
+        self.structurer(_reponse_ia({}))
+        admin = User.objects.create_superuser(email='admin@example.com', password='motdepasse123')
+        self.client.force_login(admin)
+        res = self.client.get('/admin/recette/appelia/')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, '2 appels')
+        self.assertContains(res, '0,0050 $')  # total
+        self.assertContains(res, '0,0025 $')  # colonne coût
 
     @override_settings(ANTHROPIC_API_KEY='')
     def test_sans_cle(self):

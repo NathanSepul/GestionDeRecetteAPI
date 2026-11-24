@@ -13,7 +13,9 @@ CLAUDE_MODELE, ALERTE_EMAIL.
 import base64
 import json
 import logging
+import time
 from datetime import timedelta
+from decimal import Decimal
 
 import anthropic
 from django.conf import settings
@@ -21,7 +23,7 @@ from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 
-from recette.models import EtatClaude
+from recette.models import AppelIA, EtatClaude
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,17 @@ logger = logging.getLogger(__name__)
 REESSAI_EN_PANNE = timedelta(minutes=15)
 # Erreurs passagères d'affilée (après les nouvelles tentatives du SDK) au-delà desquelles on alerte
 SEUIL_ECHECS_TEMPORAIRES = 3
+
+# Tarifs en dollars par million de tokens (entrée, sortie) : https://www.anthropic.com/pricing
+# Les images comptent dans l'entrée ; la réflexion du modèle dans la sortie.
+TARIFS = {
+    'claude-haiku-5-5': (Decimal('0.10'), Decimal('0.50')),
+    'claude-sonnet-5-5': (Decimal('2'), Decimal('10')),
+    'claude-opus-5-5': (Decimal('4'), Decimal('20')),
+}
+# Haiku 5.5 au-delà de 100 000 tokens d'entrée dans une requête
+SEUIL_LONG_CONTEXTE = 100_000
+TARIFS_LONG_CONTEXTE = {'claude-haiku-5-5': (Decimal('0.50'), Decimal('2.50'))}
 
 
 class ClaudeIndisponible(Exception):
@@ -87,28 +100,65 @@ def _client():
 
 # ---------- Appel ----------
 
-def _appeler(**requete):
-    """messages.create avec suivi de l'état : panne détectée, alerte, rétablissement."""
+def _cout(modele, tokens_entree, tokens_sortie):
+    """Coût d'un appel en dollars, None si le tarif du modèle est inconnu."""
+    # l'API peut renvoyer un identifiant plus précis que celui demandé : on compare le début
+    nom = next((m for m in TARIFS if modele == m or modele.startswith(m + '-')), None)
+    if nom is None:
+        return None
+    tarif = TARIFS_LONG_CONTEXTE.get(nom, TARIFS[nom]) if tokens_entree > SEUIL_LONG_CONTEXTE else TARIFS[nom]
+    entree, sortie = tarif
+    return (Decimal(tokens_entree) * entree + Decimal(tokens_sortie) * sortie) / Decimal(1_000_000)
+
+
+def _journaliser(etape, tache, debut, nb_images, entree, reponse=None, erreur=''):
+    """Enregistre l'appel dans le journal (admin : Appels à l'IA) ; ne fait jamais échouer l'import."""
+    try:
+        usage = getattr(reponse, 'usage', None)
+        tokens_entree = getattr(usage, 'input_tokens', 0) or 0
+        tokens_sortie = getattr(usage, 'output_tokens', 0) or 0  # réflexion comprise : facturée comme de la sortie
+        texte = next((bloc.text for bloc in reponse.content if bloc.type == 'text'), '') if reponse is not None else ''
+        modele = getattr(reponse, 'model', None) or settings.CLAUDE_MODELE
+        AppelIA.objects.create(
+            etape=etape, importVideo=tache, user=getattr(tache, 'user', None),
+            modele=modele, nbImages=nb_images, tokensEntree=tokens_entree, tokensSortie=tokens_sortie,
+            # appel refusé par l'API (erreur) : rien n'est facturé
+            cout=_cout(modele, tokens_entree, tokens_sortie) if reponse is not None else Decimal(0),
+            dureeMs=int((time.monotonic() - debut) * 1000),
+            statut=AppelIA.Statut.ERREUR if erreur else AppelIA.Statut.SUCCES,
+            stopReason=getattr(reponse, 'stop_reason', None) or '', erreur=erreur,
+            entree=entree, reponse=texte,
+        )
+    except Exception:
+        logger.exception("Journal des appels à l'IA : enregistrement impossible")
+
+
+def _appeler(etape, tache=None, nb_images=0, entree='', **requete):
+    """messages.create avec suivi de l'état (panne, alerte, rétablissement) et journal des appels (coût)."""
     etat = EtatClaude.obtenir()
     if etat.enPanne and etat.derniereTentative and timezone.now() - etat.derniereTentative < REESSAI_EN_PANNE:
         raise ClaudeIndisponible(etat.raison)
 
+    debut = time.monotonic()
     try:
         reponse = _client().messages.create(model=settings.CLAUDE_MODELE, **requete)
     except (anthropic.RateLimitError, anthropic.InternalServerError, anthropic.APIConnectionError) as e:
         # surcharge, quota par minute, réseau : passager, sauf si ça se répète
+        _journaliser(etape, tache, debut, nb_images, entree, erreur=f"{type(e).__name__} : {e}")
         _echec_temporaire(f"{type(e).__name__} : {e}")
         raise ClaudeIndisponible(str(e)) from e
     except anthropic.APIStatusError as e:
         # 401 clé invalide, 402 crédit / facturation, 403 droits, 404 modèle retiré, 400... : rien ne s'arrangera seul
+        _journaliser(etape, tache, debut, nb_images, entree, erreur=f"{type(e).__name__} ({e.status_code}) : {e.message}")
         _panne(f"{type(e).__name__} ({e.status_code}) : {e.message}")
         raise ClaudeIndisponible(str(e)) from e
 
+    _journaliser(etape, tache, debut, nb_images, entree, reponse)
     _succes()
     return reponse
 
 
-def structurer_avec_claude(titre, description, transcription='', images=()):
+def structurer_avec_claude(titre, description, transcription='', images=(), tache=None):
     """
     Recette structurée (dict conforme à SCHEMA) à partir de la description, et si disponibles de la transcription
     et des images de la vidéo (JPEG) ; ClaudeIndisponible si l'IA ne peut pas répondre.
@@ -126,6 +176,7 @@ def structurer_avec_claude(titre, description, transcription='', images=()):
     contenu.append({'type': 'text', 'text': texte})
 
     reponse = _appeler(
+        AppelIA.Etape.VIDEO if (images or transcription) else AppelIA.Etape.DESCRIPTION, tache, len(images), texte,
         max_tokens=16000,
         system=PROMPT,
         messages=[{'role': 'user', 'content': contenu}],
@@ -149,7 +200,8 @@ def verifier_maintenant():
         return False, "ANTHROPIC_API_KEY n'est pas renseignée dans le .env."
     EtatClaude.objects.filter(pk=1).update(derniereTentative=None)
     try:
-        _appeler(max_tokens=16, messages=[{'role': 'user', 'content': 'Réponds juste : ok'}])
+        _appeler(AppelIA.Etape.VERIFICATION, entree='Réponds juste : ok', max_tokens=16,
+                 messages=[{'role': 'user', 'content': 'Réponds juste : ok'}])
     except ClaudeIndisponible as e:
         return False, str(e)
     return True, "L'API Claude répond."

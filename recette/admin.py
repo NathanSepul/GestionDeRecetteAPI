@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.db.models import Count, Sum
+from django.utils import timezone
 import recette.models
 
 class ProduitMesureInline(admin.TabularInline):
@@ -83,12 +85,78 @@ class PreparationAdminTopic(admin.ModelAdmin):
     ordering = ('recette', 'noOrdre')
 
 
+def _dollars(valeur):
+    """0.0025 -> "0,0025 $" (format de l'admin, en français)."""
+    return '—' if valeur is None else f"{valeur:.4f} $".replace('.', ',')
+
+
+class AppelIAInline(admin.TabularInline):
+    model = recette.models.AppelIA
+    extra = 0
+    can_delete = False
+    fields = ('date', 'etape', 'nbImages', 'tokensEntree', 'tokensSortie', 'cout', 'dureeMs', 'statut')
+    readonly_fields = fields
+    show_change_link = True
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(recette.models.ImportVideo)
 class ImportVideoAdmin(admin.ModelAdmin):
     """Suivi des imports TikTok (traités en arrière-plan) : utile pour voir pourquoi un import a échoué."""
-    list_display = ('url', 'user', 'statut', 'recette', 'creeLe')
-    list_filter = ('statut',)
+    list_display = ('url', 'user', 'statut', 'recette', 'cout_ia', 'creeLe')
+    list_filter = ('statut', 'creeLe')
     readonly_fields = ('user', 'url', 'typeRecette', 'importerImage', 'statut', 'recette', 'erreur', 'creeLe', 'majLe')
+    inlines = [AppelIAInline]
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(total_ia=Sum('appelsIA__cout'))
+
+    @admin.display(description="Coût IA", ordering='total_ia')
+    def cout_ia(self, obj):
+        return _dollars(obj.total_ia)
+
+
+@admin.register(recette.models.AppelIA)
+class AppelIAAdmin(admin.ModelAdmin):
+    """Tous les appels à l'API Claude, avec leur coût ; total de la sélection en haut de la liste."""
+    list_display = ('date', 'etape', 'importVideo', 'user', 'modele', 'nbImages', 'tokensEntree', 'tokensSortie',
+                    'cout_affiche', 'duree', 'statut')
+    # filtre par date en colonne (date_hierarchy demande les fuseaux horaires installés dans MySQL)
+    list_filter = ('date', 'statut', 'etape', 'modele')
+    search_fields = ('importVideo__url', 'user__email', 'erreur')
+    readonly_fields = [f.name for f in recette.models.AppelIA._meta.fields]
+    change_list_template = 'admin/recette/appelia/change_list.html'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Coût", ordering='cout')
+    def cout_affiche(self, obj):
+        return _dollars(obj.cout)
+
+    @admin.display(description="Durée", ordering='dureeMs')
+    def duree(self, obj):
+        return f"{obj.dureeMs / 1000:.1f} s"
+
+    def changelist_view(self, request, extra_context=None):
+        reponse = super().changelist_view(request, extra_context)
+        try:
+            selection = reponse.context_data['cl'].queryset
+        except (AttributeError, KeyError):
+            return reponse  # redirection (filtre invalide...)
+        maintenant = timezone.localtime()
+        debut_mois = maintenant.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        reponse.context_data['totaux'] = {
+            'selection': selection.aggregate(nombre=Count('id'), cout=Sum('cout'), entree=Sum('tokensEntree'), sortie=Sum('tokensSortie')),
+            'mois': recette.models.AppelIA.objects.filter(date__gte=debut_mois).aggregate(nombre=Count('id'), cout=Sum('cout')),
+            'total': recette.models.AppelIA.objects.aggregate(nombre=Count('id'), cout=Sum('cout')),
+        }
+        return reponse
 
 
 

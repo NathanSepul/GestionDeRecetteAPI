@@ -134,7 +134,7 @@ def recette_complete(donnees):
     return sum(1 for est_section, _ in donnees['ingredients'] if not est_section) >= 2 and any(not s for s, _ in donnees['etapes'])
 
 
-def importer_recette_depuis_video(url, user, type_recette, importer_image=True):
+def importer_recette_depuis_video(url, user, type_recette, importer_image=True, tache=None):
     if not ia_disponible():
         if not ia_configuree():
             raise ImportRecetteErreur("L'import depuis une vidéo n'est pas activé sur ce serveur.")
@@ -145,13 +145,13 @@ def importer_recette_depuis_video(url, user, type_recette, importer_image=True):
     try:
         # 1. Recette visiblement écrite dans la description : Claude la lit seule, sans télécharger la vidéo
         if description_avec_recette(video['description']):
-            donnees = donnees_recette(video, structurer_avec_claude(video['titre'], video['description']))
+            donnees = donnees_recette(video, structurer_avec_claude(video['titre'], video['description'], tache=tache))
             if not recette_complete(donnees):
                 donnees = None
         # 2. Sinon : voix et texte à l'écran, lus par Claude avec la description
         if donnees is None:
             transcription, images = analyser_video(url) if media_disponible() else ('', [])
-            donnees = donnees_recette(video, structurer_avec_claude(video['titre'], video['description'], transcription, images))
+            donnees = donnees_recette(video, structurer_avec_claude(video['titre'], video['description'], transcription, images, tache=tache))
     except ClaudeIndisponible:
         raise ImportRecetteErreur("La lecture automatique des recettes vidéo est momentanément indisponible. Réessaie plus tard.")
 
@@ -175,7 +175,7 @@ def traiter(import_id):
         tache.statut = ImportVideo.Statut.EN_COURS
         tache.save(update_fields=['statut', 'majLe'])
         try:
-            tache.recette = importer_recette_depuis_video(tache.url, tache.user, tache.typeRecette, tache.importerImage)
+            tache.recette = importer_recette_depuis_video(tache.url, tache.user, tache.typeRecette, tache.importerImage, tache=tache)
             tache.statut = ImportVideo.Statut.TERMINE
         except ImportRecetteErreur as e:
             tache.statut, tache.erreur = ImportVideo.Statut.ERREUR, str(e)
